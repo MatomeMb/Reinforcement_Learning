@@ -16,8 +16,8 @@ class FourRooms:
     BORDER = -1
     EMPTY = 0
     RED = 1
-    BLUE = 2
-    GREEN = 3
+    BLUE = 3
+    GREEN = 2
 
     custom_cmap = colors.LinearSegmentedColormap.from_list('', ['black', 'white', 'red', 'green', 'blue', 'pink',
                                                                 'violet'])
@@ -40,19 +40,19 @@ class FourRooms:
                 [-1,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, -1],  # 2
                 [-1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1],  # 3
                 [-1,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, -1],  # 4
-                [-1,  0, -1, -1, -1, -1, -1,  0,  0,  0,  0,  0, -1],  # 5
-                [-1,  0,  0,  0,  0,  0, -1, -1, -1,  0, -1, -1, -1],  # 6
-                [-1,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, -1],  # 7
-                [-1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1],  # 8
+                [-1,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, -1],  # 5
+                [-1, -1,  0, -1, -1, -1, -1,  0,  0,  0,  0,  0, -1],  # 6
+                [-1,  0,  0,  0,  0,  0, -1, -1, -1,  0, -1, -1, -1],  # 7
+                [-1,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, -1],  # 8
                 [-1,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, -1],  # 9
-                [-1,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, -1],  # 10
+                [-1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1],  # 10
                 [-1,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0, -1],  # 11
                 [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]   # 12
             ], dtype=numpy.float32
         )
 
         # Generate Packages
-        self.__start_num_packages = 1 if self.scenario == 'simple' else 4
+        self.__start_num_packages = 1 if self.scenario == 'simple' else 3
         self.__current_num_packages = self.__start_num_packages
 
         self.__package_locations = []
