@@ -48,6 +48,92 @@ def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsil
     
     return rewards, steps, epsilons
 
+def evaluate_policy(fourRoomsObj, Q, num_episodes=10, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+        random.seed(seed)
+        
+    total_rewards = []
+    total_steps = []
+    
+    for _ in range(num_episodes):
+        fourRoomsObj.newEpoch()
+        state = fourRoomsObj.getPosition()
+        k = fourRoomsObj.getPackagesRemaining()
+        episode_reward = 0
+        steps = 0
+        
+        while not fourRoomsObj.isTerminal():
+            action = np.argmax(Q[state[0]-1, state[1]-1, k])
+            gridType, newPos, packagesRemaining, isTerminal = fourRoomsObj.takeAction(action)
+            if gridType > 0:
+                reward = -1 if isTerminal and packagesRemaining > 0 else 1
+            else:
+                reward = -0.01
+            episode_reward += reward
+            steps += 1
+            state, k = newPos, packagesRemaining
+        
+        total_rewards.append(episode_reward)
+        total_steps.append(steps)
+    
+    return np.mean(total_rewards), np.mean(total_steps)
+
+def visualize_policy(Q, title="Learned Policy for Scenario 3", save_path="policy_scenario3.png"):
+    fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+    action_symbols = ['↑', '↓', '←', '→']
+    
+    for k in range(4):
+        policy = np.zeros((11, 11), dtype=object)
+        value = np.zeros((11, 11))
+        for i in range(11):
+            for j in range(11):
+                best_action = np.argmax(Q[i, j, k])
+                policy[i, j] = action_symbols[best_action]
+                value[i, j] = np.max(Q[i, j, k])
+                
+        axes[k].imshow(value, cmap='viridis')
+        for i in range(11):
+            for j in range(11):
+                axes[k].text(j, i, policy[i, j], ha='center', va='center', color='white')
+        axes[k].set_title(f"Packages Remaining: {k}")
+        axes[k].set_xticks(np.arange(11))
+        axes[k].set_yticks(np.arange(11))
+        axes[k].set_xticklabels(np.arange(1, 12))
+        axes[k].set_yticklabels(np.arange(1, 12))
+        axes[k].grid(False)
+    
+    plt.suptitle(title)
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+
+def show_final_path(fourRoomsObj, Q, save_path):
+    """
+    Shows and saves the final path taken by the agent using the learned policy.
+    
+    Args:
+        fourRoomsObj: The environment object
+        Q: The trained Q-table
+        save_path: Path to save the visualization
+    
+    Returns:
+        int: Number of steps taken
+    """
+    fourRoomsObj.newEpoch()
+    state = fourRoomsObj.getPosition()
+    k = fourRoomsObj.getPackagesRemaining()
+    steps = 0
+    
+    while not fourRoomsObj.isTerminal():
+        action = np.argmax(Q[state[0]-1, state[1]-1, k])
+        _, newPos, packagesRemaining, _ = fourRoomsObj.takeAction(action)
+        state, k = newPos, packagesRemaining
+        steps += 1
+    
+    fourRoomsObj.showPath(-1, savefig=save_path)
+    return steps
+
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 3: Ordered Package Collection')
     parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
