@@ -102,15 +102,20 @@ def visualize_policy(Q, title="Learned Policy", save_path=None):
         plt.savefig(save_path)
     plt.close()
 
-def show_final_path(fourRoomsObj, Q):
+def show_final_path(fourRoomsObj, Q, save_path=None):
     fourRoomsObj.newEpoch()
     state = fourRoomsObj.getPosition()
     k = fourRoomsObj.getPackagesRemaining()
+    steps = 0
+    
     while not fourRoomsObj.isTerminal():
         action = np.argmax(Q[state[0]-1, state[1]-1, k])
         _, newPos, packagesRemaining, _ = fourRoomsObj.takeAction(action)
         state, k = newPos, packagesRemaining
-    fourRoomsObj.showPath(-1, savefig='path_scenario1.png')
+        steps += 1
+    
+    print(f"Path completed in {steps} steps")
+    fourRoomsObj.showPath(-1, savefig=save_path)
 
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 1: Simple Package Collection')
@@ -155,7 +160,11 @@ def main():
     plt.savefig('learning_curves_scenario1.png')
     plt.close()
     
-    show_final_path(fourRoomsObj, Q1)
+    # Show final paths
+    print("Generating path visualization for high exploration strategy...")
+    show_final_path(fourRoomsObj, Q1, 'path_high_exploration.png')
+    print("Generating path visualization for moderate exploration strategy...")
+    show_final_path(fourRoomsObj, Q2, 'path_moderate_exploration.png')
 
 if __name__ == "__main__":
     main()
