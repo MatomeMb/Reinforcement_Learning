@@ -101,6 +101,32 @@ def visualize_policy(Q, title="Learned Policy for Scenario 2", save_path="policy
     plt.savefig(save_path)
     plt.close()
 
+def show_final_path(fourRoomsObj, Q, save_path):
+    """
+    Shows and saves the final path taken by the agent using the learned policy.
+    
+    Args:
+        fourRoomsObj: The environment object
+        Q: The trained Q-table
+        save_path: Path to save the visualization
+    
+    Returns:
+        int: Number of steps taken
+    """
+    fourRoomsObj.newEpoch()
+    state = fourRoomsObj.getPosition()
+    k = fourRoomsObj.getPackagesRemaining()
+    steps = 0
+    
+    while not fourRoomsObj.isTerminal():
+        action = np.argmax(Q[state[0]-1, state[1]-1, k])
+        _, newPos, packagesRemaining, _ = fourRoomsObj.takeAction(action)
+        state, k = newPos, packagesRemaining
+        steps += 1
+    
+    fourRoomsObj.showPath(-1, savefig=save_path)
+    return steps
+
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 2: Multiple Package Collection')
     parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
