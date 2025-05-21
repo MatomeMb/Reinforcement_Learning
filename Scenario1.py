@@ -172,6 +172,100 @@ def plot_learning_curves(rewards1, steps1, epsilons1, rewards2, steps2, epsilons
     plt.savefig(f'{save_dir}epsilon_decay.png')
     plt.close()
 
+def sensitivity_analysis(fourRoomsObj, parameter_name, parameter_values, fixed_params, episodes=500, seed=None, output_dir=''):
+    """
+    Perform sensitivity analysis on a specific parameter.
+    
+    Args:
+        fourRoomsObj: The environment object
+        parameter_name: Name of the parameter to vary
+        parameter_values: List of values to test for the parameter
+        fixed_params: Dictionary of fixed parameters
+        episodes: Number of episodes to train for each parameter value
+        seed: Random seed for reproducibility
+        output_dir: Directory to save output files
+    
+    Returns:
+        Dictionary of results for each parameter value
+    """
+    results = {
+        'rewards': [],
+        'steps': [],
+        'avg_rewards': [],
+        'avg_steps': []
+    }
+    
+    for value in parameter_values:
+        print(f"Testing {parameter_name}={value}...")
+        
+        # Create a new Q-table
+        Q = np.zeros((11, 11, 2, 4))
+        
+        # Set the parameter value
+        params = fixed_params.copy()
+        params[parameter_name] = value
+        
+        # Train with this parameter value
+        rewards, steps, _ = train(
+            fourRoomsObj, Q, 
+            alpha=params['alpha'], 
+            gamma=params['gamma'], 
+            epsilon_start=params['epsilon_start'], 
+            epsilon_decay=params['epsilon_decay'], 
+            min_epsilon=params['min_epsilon'], 
+            episodes=episodes, 
+            seed=seed
+        )
+        
+        # Evaluate the policy
+        avg_reward, avg_steps = evaluate_policy(fourRoomsObj, Q, seed=seed)
+        
+        # Store results
+        results['rewards'].append(rewards)
+        results['steps'].append(steps)
+        results['avg_rewards'].append(avg_reward)
+        results['avg_steps'].append(avg_steps)
+        
+        print(f"{parameter_name}={value} - Avg Reward: {avg_reward:.2f}, Avg Steps: {avg_steps:.2f}")
+    
+    # Plot average rewards for each parameter value
+    plt.figure(figsize=(10, 5))
+    plt.plot(parameter_values, results['avg_rewards'], 'o-')
+    plt.xlabel(parameter_name)
+    plt.ylabel('Average Reward')
+    plt.title(f'Effect of {parameter_name} on Average Reward')
+    plt.grid(True)
+    plt.savefig(f'{output_dir}sensitivity_{parameter_name}_reward.png')
+    plt.close()
+    
+    # Plot average steps for each parameter value
+    plt.figure(figsize=(10, 5))
+    plt.plot(parameter_values, results['avg_steps'], 'o-')
+    plt.xlabel(parameter_name)
+    plt.ylabel('Average Steps')
+    plt.title(f'Effect of {parameter_name} on Average Steps')
+    plt.grid(True)
+    plt.savefig(f'{output_dir}sensitivity_{parameter_name}_steps.png')
+    plt.close()
+    
+    # Plot learning curves for each parameter value
+    plt.figure(figsize=(10, 5))
+    for i, value in enumerate(parameter_values):
+        if len(results['rewards'][i]) > 50:  # Apply smoothing if enough data
+            rewards_smooth = moving_average(results['rewards'][i], 50)
+            plt.plot(range(50-1, len(results['rewards'][i])), rewards_smooth, 
+                     label=f'{parameter_name}={value}')
+        else:
+            plt.plot(results['rewards'][i], label=f'{parameter_name}={value}')
+    plt.xlabel('Episodes')
+    plt.ylabel('Total Reward')
+    plt.title(f'Learning Curves for Different {parameter_name} Values')
+    plt.legend()
+    plt.savefig(f'{output_dir}sensitivity_{parameter_name}_learning_curves.png')
+    plt.close()
+    
+    return results
+
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 1: Simple Package Collection')
     parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
@@ -181,6 +275,7 @@ def main():
     parser.add_argument('-gamma', type=float, default=0.9, help='Discount factor')
     parser.add_argument('-output_dir', type=str, default='', help='Directory to save output files')
     parser.add_argument('-window_size', type=int, default=50, help='Window size for moving average smoothing')
+    parser.add_argument('-sensitivity_analysis', action='store_true', help='Perform hyperparameter sensitivity analysis')
     args = parser.parse_args()
 
     # Set random seeds for reproducibility
@@ -283,6 +378,34 @@ def main():
     plt.legend()
     plt.savefig(f'{output_dir}gamma_comparison_steps.png')
     plt.close()
+
+    # Hyperparameter sensitivity analysis
+    if args.sensitivity_analysis:
+        print("\n--- Performing Hyperparameter Sensitivity Analysis ---")
+        
+        # Fixed parameters
+        fixed_params = {
+            'alpha': args.alpha,
+            'gamma': args.gamma,
+            'epsilon_start': 1.0,
+            'epsilon_decay': 0.995,
+            'min_epsilon': 0.01
+        }
+        
+        # Test different learning rates
+        alpha_values = [0.01, 0.05, 0.1, 0.2, 0.3]
+        sensitivity_analysis(fourRoomsObj, 'alpha', alpha_values, fixed_params, 
+                            episodes=args.episodes//2, seed=args.seed, output_dir=output_dir)
+        
+        # Test different epsilon decay rates
+        epsilon_decay_values = [0.99, 0.995, 0.998, 0.999]
+        sensitivity_analysis(fourRoomsObj, 'epsilon_decay', epsilon_decay_values, fixed_params, 
+                            episodes=args.episodes//2, seed=args.seed, output_dir=output_dir)
+        
+        # Test different minimum epsilon values
+        min_epsilon_values = [0.001, 0.01, 0.05, 0.1]
+        sensitivity_analysis(fourRoomsObj, 'min_epsilon', min_epsilon_values, fixed_params, 
+                            episodes=args.episodes//2, seed=args.seed, output_dir=output_dir)
 
 if __name__ == "__main__":
     main()
