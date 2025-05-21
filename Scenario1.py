@@ -3,8 +3,9 @@ import argparse
 import matplotlib.pyplot as plt
 from FourRooms import FourRooms
 import random
+from tqdm import tqdm
 
-def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsilon, episodes=1000, seed=None):
+def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsilon, episodes=1000, seed=None, show_progress=True):
     if seed is not None:
         np.random.seed(seed)
         random.seed(seed)
@@ -13,7 +14,10 @@ def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsil
     steps = []
     epsilons = []
     
-    for episode in range(episodes):
+    # Create progress bar if requested
+    episode_iterator = tqdm(range(episodes), desc="Training", disable=not show_progress)
+    
+    for episode in episode_iterator:
         fourRoomsObj.newEpoch()
         state = fourRoomsObj.getPosition()
         k = fourRoomsObj.getPackagesRemaining()
@@ -41,6 +45,15 @@ def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsil
         
         rewards.append(total_reward)
         steps.append(step_count)
+        
+        # Update progress bar with current metrics
+        if show_progress:
+            episode_iterator.set_postfix({
+                'ε': f"{epsilon:.3f}",
+                'reward': f"{total_reward:.2f}",
+                'steps': step_count,
+                'avg_reward': f"{np.mean(rewards[-100:]):.2f}" if len(rewards) > 0 else "N/A"
+            })
     
     return rewards, steps, epsilons
 
@@ -293,9 +306,9 @@ def main():
     
     # Strategy 1: High exploration
     rewards1, steps1, epsilons1 = train(fourRoomsObj, Q1, args.alpha, args.gamma, 
-                                        epsilon_start=1.0, epsilon_decay=0.995, 
-                                        min_epsilon=0.01, episodes=args.episodes, 
-                                        seed=args.seed)
+                                   epsilon_start=1.0, epsilon_decay=0.995, 
+                                   min_epsilon=0.01, episodes=args.episodes, 
+                                   seed=args.seed, show_progress=args.show_progress)
     
     # Strategy 2: Moderate exploration
     rewards2, steps2, epsilons2 = train(fourRoomsObj, Q2, args.alpha, args.gamma, 
