@@ -72,6 +72,36 @@ def evaluate_policy(fourRoomsObj, Q, num_episodes=10, seed=None):
     
     return np.mean(total_rewards), np.mean(total_steps)
 
+def visualize_policy(Q, title="Learned Policy", save_path=None):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    action_symbols = ['↑', '↓', '←', '→']
+    
+    for k in range(2):
+        policy = np.zeros((11, 11), dtype=object)
+        value = np.zeros((11, 11))
+        for i in range(11):
+            for j in range(11):
+                best_action = np.argmax(Q[i, j, k])
+                policy[i, j] = action_symbols[best_action]
+                value[i, j] = np.max(Q[i, j, k])
+                
+        axes[k].imshow(value, cmap='viridis')
+        for i in range(11):
+            for j in range(11):
+                axes[k].text(j, i, policy[i, j], ha='center', va='center', color='white')
+        axes[k].set_title(f"Package Remaining: {k}")
+        axes[k].set_xticks(np.arange(11))
+        axes[k].set_yticks(np.arange(11))
+        axes[k].set_xticklabels(np.arange(1, 12))
+        axes[k].set_yticklabels(np.arange(1, 12))
+        axes[k].grid(False)
+    
+    plt.suptitle(title)
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path)
+    plt.close()
+
 def show_final_path(fourRoomsObj, Q):
     fourRoomsObj.newEpoch()
     state = fourRoomsObj.getPosition()
@@ -110,6 +140,10 @@ def main():
     
     print(f"High Exploration - Avg Reward: {avg_reward1:.2f}, Avg Steps: {avg_steps1:.2f}")
     print(f"Moderate Exploration - Avg Reward: {avg_reward2:.2f}, Avg Steps: {avg_steps2:.2f}")
+    
+    # Visualize policies
+    visualize_policy(Q1, "High Exploration Policy", 'policy_high_exploration.png')
+    visualize_policy(Q2, "Moderate Exploration Policy", 'policy_moderate_exploration.png')
     
     # Plot learning curves
     plt.plot(rewards1, label='High Exploration: ε=1.0, decay=0.995')
