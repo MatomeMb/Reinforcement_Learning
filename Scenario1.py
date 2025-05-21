@@ -2,8 +2,13 @@ import numpy as np
 import argparse
 import matplotlib.pyplot as plt
 from FourRooms import FourRooms
+import random
 
-def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsilon, episodes=1000):
+def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsilon, episodes=1000, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+        random.seed(seed)
+        
     rewards = []
     for episode in range(episodes):
         fourRoomsObj.newEpoch()
@@ -44,7 +49,12 @@ def show_final_path(fourRoomsObj, Q):
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 1: Simple Package Collection')
     parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
+    parser.add_argument('-seed', type=int, default=42, help='Random seed for reproducibility')
     args = parser.parse_args()
+
+    # Set random seeds for reproducibility
+    np.random.seed(args.seed)
+    random.seed(args.seed)
 
     fourRoomsObj = FourRooms('simple', stochastic=args.stochastic)
     Q1 = np.zeros((11, 11, 2, 4))  # x: 1-11, y: 1-11, k: 0-1, actions: 0-3
@@ -53,10 +63,10 @@ def main():
     alpha, gamma, min_epsilon = 0.1, 0.9, 0.01
     
     # Strategy 1: High exploration
-    rewards1 = train(fourRoomsObj, Q1, alpha, gamma, epsilon_start=1.0, epsilon_decay=0.995, min_epsilon=min_epsilon)
+    rewards1 = train(fourRoomsObj, Q1, alpha, gamma, epsilon_start=1.0, epsilon_decay=0.995, min_epsilon=min_epsilon, seed=args.seed)
     
     # Strategy 2: Moderate exploration
-    rewards2 = train(fourRoomsObj, Q2, alpha, gamma, epsilon_start=0.5, epsilon_decay=0.99, min_epsilon=min_epsilon)
+    rewards2 = train(fourRoomsObj, Q2, alpha, gamma, epsilon_start=0.5, epsilon_decay=0.99, min_epsilon=min_epsilon, seed=args.seed)
     
     # Plot learning curves
     plt.plot(rewards1, label='High Exploration: ε=1.0, decay=0.995')
