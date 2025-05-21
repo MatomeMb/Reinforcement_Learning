@@ -187,7 +187,7 @@ def main():
     visualize_policy(Q2, "Moderate Exploration Policy", f'{output_dir}policy_moderate_exploration.png')
     
     # Plot learning curves
-    plot_learning_curves(rewards1, steps1, rewards2, steps2, output_dir)
+    plot_learning_curves(rewards1, steps1, epsilons1, rewards2, steps2, epsilons2, output_dir)
     
     # Show final paths
     print("Generating path visualization for high exploration strategy...")
