@@ -227,6 +227,62 @@ def main():
     show_final_path(fourRoomsObj, Q1, f'{output_dir}path_high_exploration.png')
     print("Generating path visualization for moderate exploration strategy...")
     show_final_path(fourRoomsObj, Q2, f'{output_dir}path_moderate_exploration.png')
+    
+    # Compare different gamma values
+    print("\n--- Comparing different gamma values ---")
+    gammas = [0.8, 0.9, 0.99]
+    Q_gammas = [np.zeros((11, 11, 2, 4)) for _ in range(len(gammas))]
+    rewards_gammas = []
+    steps_gammas = []
+    
+    for i, gamma in enumerate(gammas):
+        print(f"Training with gamma={gamma}...")
+        rewards, steps, _ = train(fourRoomsObj, Q_gammas[i], args.alpha, gamma, 
+                                epsilon_start=1.0, epsilon_decay=0.995, 
+                                min_epsilon=0.01, episodes=args.episodes, 
+                                seed=args.seed)
+        rewards_gammas.append(rewards)
+        steps_gammas.append(steps)
+        
+        # Evaluate policy
+        avg_reward, avg_steps = evaluate_policy(fourRoomsObj, Q_gammas[i], seed=args.seed)
+        print(f"Gamma={gamma} - Avg Reward: {avg_reward:.2f}, Avg Steps: {avg_steps:.2f}")
+        
+        # Visualize policy
+        visualize_policy(Q_gammas[i], f"Policy with Gamma={gamma}", 
+                        f'{output_dir}policy_gamma_{gamma}.png')
+    
+    # Plot comparison of rewards
+    plt.figure(figsize=(10, 5))
+    for i, gamma in enumerate(gammas):
+        if len(rewards_gammas[i]) > args.window_size:  # Apply smoothing if enough data
+            rewards_smooth = moving_average(rewards_gammas[i], args.window_size)
+            plt.plot(range(args.window_size-1, len(rewards_gammas[i])), rewards_smooth, 
+                     label=f'Gamma={gamma}')
+        else:
+            plt.plot(rewards_gammas[i], label=f'Gamma={gamma}')
+    plt.xlabel('Episodes')
+    plt.ylabel('Total Reward')
+    plt.title('Effect of Discount Factor (Gamma) on Learning')
+    plt.legend()
+    plt.savefig(f'{output_dir}gamma_comparison_rewards.png')
+    plt.close()
+    
+    # Plot comparison of steps
+    plt.figure(figsize=(10, 5))
+    for i, gamma in enumerate(gammas):
+        if len(steps_gammas[i]) > args.window_size:  # Apply smoothing if enough data
+            steps_smooth = moving_average(steps_gammas[i], args.window_size)
+            plt.plot(range(args.window_size-1, len(steps_gammas[i])), steps_smooth, 
+                     label=f'Gamma={gamma}')
+        else:
+            plt.plot(steps_gammas[i], label=f'Gamma={gamma}')
+    plt.xlabel('Episodes')
+    plt.ylabel('Steps per Episode')
+    plt.title('Effect of Discount Factor (Gamma) on Steps per Episode')
+    plt.legend()
+    plt.savefig(f'{output_dir}gamma_comparison_steps.png')
+    plt.close()
 
 if __name__ == "__main__":
     main()
