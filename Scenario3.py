@@ -134,6 +134,70 @@ def show_final_path(fourRoomsObj, Q, save_path):
     fourRoomsObj.showPath(-1, savefig=save_path)
     return steps
 
+def moving_average(data, window_size):
+    """
+    Calculate the moving average of the data.
+    
+    Args:
+        data: List of values
+        window_size: Size of the moving window
+    
+    Returns:
+        List of moving averages
+    """
+    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+
+def plot_learning_curves(rewards, steps, epsilons, window_size=50, save_dir=""):
+    """
+    Plot learning curves for rewards, steps, and epsilon decay.
+    
+    Args:
+        rewards: List of rewards per episode
+        steps: List of steps per episode
+        epsilons: List of epsilon values per episode
+        window_size: Window size for moving average
+        save_dir: Directory to save the plots
+    """
+    # Plot rewards
+    plt.figure(figsize=(10, 5))
+    plt.plot(rewards, alpha=0.3, color='blue', label='Raw')
+    if len(rewards) >= window_size:
+        rewards_smooth = moving_average(rewards, window_size)
+        plt.plot(range(window_size-1, len(rewards)), rewards_smooth, 
+                 color='blue', label=f'Moving Avg (window={window_size})')
+    plt.xlabel('Episodes')
+    plt.ylabel('Total Reward')
+    plt.title('Rewards per Episode')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{save_dir}reward_learning_curve.png")
+    plt.close()
+    
+    # Plot steps
+    plt.figure(figsize=(10, 5))
+    plt.plot(steps, alpha=0.3, color='green', label='Raw')
+    if len(steps) >= window_size:
+        steps_smooth = moving_average(steps, window_size)
+        plt.plot(range(window_size-1, len(steps)), steps_smooth, 
+                 color='green', label=f'Moving Avg (window={window_size})')
+    plt.xlabel('Episodes')
+    plt.ylabel('Steps')
+    plt.title('Steps per Episode')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{save_dir}steps_learning_curve.png")
+    plt.close()
+    
+    # Plot epsilon decay
+    plt.figure(figsize=(10, 5))
+    plt.plot(epsilons)
+    plt.xlabel('Episodes')
+    plt.ylabel('Epsilon')
+    plt.title('Epsilon Decay')
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{save_dir}epsilon_decay.png")
+    plt.close()
+
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 3: Ordered Package Collection')
     parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
