@@ -201,9 +201,19 @@ def plot_learning_curves(rewards, steps, epsilons, window_size=50, save_dir=""):
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 3: Ordered Package Collection')
     parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
+    parser.add_argument('-episodes', type=int, default=1000, help='Number of training episodes')
+    parser.add_argument('-alpha', type=float, default=0.1, help='Learning rate')
+    parser.add_argument('-gamma', type=float, default=0.9, help='Discount factor')
     parser.add_argument('-seed', type=int, default=42, help='Random seed for reproducibility')
+    parser.add_argument('-window_size', type=int, default=50, help='Window size for moving average')
+    parser.add_argument('-show_progress', action='store_true', help='Show progress bar during training')
+    parser.add_argument('-output_dir', type=str, default='', help='Directory to save output files')
     args = parser.parse_args()
-
+    
+    # Create output directory if it doesn't exist
+    if args.output_dir and not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    
     # Set random seeds for reproducibility
     np.random.seed(args.seed)
     random.seed(args.seed)
