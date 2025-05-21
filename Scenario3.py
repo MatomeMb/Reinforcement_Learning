@@ -78,5 +78,9 @@ def main():
         state, k = newPos, packagesRemaining
     fourRoomsObj.showPath(-1, savefig='path_scenario3.png')
 
+    # Evaluate policy
+    avg_reward, avg_steps = evaluate_policy(fourRoomsObj, Q, seed=args.seed)
+    print(f"Average Reward: {avg_reward:.2f}, Average Steps: {avg_steps:.2f}")
+
 if __name__ == "__main__":
     main()
