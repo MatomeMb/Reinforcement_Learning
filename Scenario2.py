@@ -44,6 +44,34 @@ def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsil
     
     return rewards, steps, epsilons
 
+def evaluate_policy(fourRoomsObj, Q, num_episodes=10, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+        random.seed(seed)
+        
+    total_rewards = []
+    total_steps = []
+    
+    for _ in range(num_episodes):
+        fourRoomsObj.newEpoch()
+        state = fourRoomsObj.getPosition()
+        k = fourRoomsObj.getPackagesRemaining()
+        episode_reward = 0
+        steps = 0
+        
+        while not fourRoomsObj.isTerminal():
+            action = np.argmax(Q[state[0]-1, state[1]-1, k])
+            gridType, newPos, packagesRemaining, _ = fourRoomsObj.takeAction(action)
+            reward = 1 if gridType > 0 else -0.01
+            episode_reward += reward
+            steps += 1
+            state, k = newPos, packagesRemaining
+        
+        total_rewards.append(episode_reward)
+        total_steps.append(steps)
+    
+    return np.mean(total_rewards), np.mean(total_steps)
+
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 2: Multiple Package Collection')
     parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
