@@ -10,12 +10,17 @@ def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsil
         random.seed(seed)
         
     rewards = []
+    steps = []
+    epsilons = []
+    
     for episode in range(episodes):
         fourRoomsObj.newEpoch()
         state = fourRoomsObj.getPosition()
         k = fourRoomsObj.getPackagesRemaining()
         total_reward = 0
+        step_count = 0
         epsilon = max(min_epsilon, epsilon_start * (epsilon_decay ** episode))
+        epsilons.append(epsilon)
         
         while not fourRoomsObj.isTerminal():
             if np.random.rand() < epsilon:
@@ -27,6 +32,7 @@ def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsil
             reward = 1 if gridType > 0 else -0.01
             
             total_reward += reward
+            step_count += 1
             next_state = newPos
             next_k = packagesRemaining
             max_next_Q = 0 if isTerminal else np.max(Q[next_state[0]-1, next_state[1]-1, next_k])
@@ -34,7 +40,9 @@ def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsil
             state, k = next_state, next_k
         
         rewards.append(total_reward)
-    return rewards
+        steps.append(step_count)
+    
+    return rewards, steps, epsilons
 
 def show_final_path(fourRoomsObj, Q):
     fourRoomsObj.newEpoch()
@@ -63,10 +71,10 @@ def main():
     alpha, gamma, min_epsilon = 0.1, 0.9, 0.01
     
     # Strategy 1: High exploration
-    rewards1 = train(fourRoomsObj, Q1, alpha, gamma, epsilon_start=1.0, epsilon_decay=0.995, min_epsilon=min_epsilon, seed=args.seed)
+    rewards1, steps1, epsilons1 = train(fourRoomsObj, Q1, alpha, gamma, epsilon_start=1.0, epsilon_decay=0.995, min_epsilon=min_epsilon, seed=args.seed)
     
     # Strategy 2: Moderate exploration
-    rewards2 = train(fourRoomsObj, Q2, alpha, gamma, epsilon_start=0.5, epsilon_decay=0.99, min_epsilon=min_epsilon, seed=args.seed)
+    rewards2, steps2, epsilons2 = train(fourRoomsObj, Q2, alpha, gamma, epsilon_start=0.5, epsilon_decay=0.99, min_epsilon=min_epsilon, seed=args.seed)
     
     # Plot learning curves
     plt.plot(rewards1, label='High Exploration: ε=1.0, decay=0.995')
