@@ -117,11 +117,25 @@ def show_final_path(fourRoomsObj, Q, save_path=None):
     print(f"Path completed in {steps} steps")
     fourRoomsObj.showPath(-1, savefig=save_path)
 
-def plot_learning_curves(rewards1, steps1, rewards2, steps2, save_dir=''):
-    # Plot rewards
+def moving_average(data, window_size):
+    """Calculate the moving average of the given data."""
+    if window_size > len(data):
+        window_size = len(data)
+    cumsum = np.cumsum(np.insert(data, 0, 0)) 
+    return (cumsum[window_size:] - cumsum[:-window_size]) / window_size
+
+def plot_learning_curves(rewards1, steps1, epsilons1, rewards2, steps2, epsilons2, save_dir='', window_size=50):
+    # Plot rewards (with moving average)
     plt.figure(figsize=(10, 5))
-    plt.plot(rewards1, label='High Exploration: ε=1.0, decay=0.995')
-    plt.plot(rewards2, label='Moderate Exploration: ε=0.5, decay=0.99')
+    if len(rewards1) > window_size:
+        rewards1_smooth = moving_average(rewards1, window_size)
+        rewards2_smooth = moving_average(rewards2, window_size)
+        plt.plot(range(window_size-1, len(rewards1)), rewards1_smooth, 
+                 label='High Exploration (Smoothed)')
+        plt.plot(range(window_size-1, len(rewards2)), rewards2_smooth, 
+                 label='Moderate Exploration (Smoothed)')
+    plt.plot(rewards1, alpha=0.3, label='High Exploration: Raw')
+    plt.plot(rewards2, alpha=0.3, label='Moderate Exploration: Raw')
     plt.xlabel('Episodes')
     plt.ylabel('Total Reward')
     plt.title('Reward Learning Curves')
@@ -129,15 +143,33 @@ def plot_learning_curves(rewards1, steps1, rewards2, steps2, save_dir=''):
     plt.savefig(f'{save_dir}reward_learning_curves.png')
     plt.close()
     
-    # Plot steps per episode
+    # Plot steps per episode (with moving average)
     plt.figure(figsize=(10, 5))
-    plt.plot(steps1, label='High Exploration: ε=1.0, decay=0.995')
-    plt.plot(steps2, label='Moderate Exploration: ε=0.5, decay=0.99')
+    if len(steps1) > window_size:
+        steps1_smooth = moving_average(steps1, window_size)
+        steps2_smooth = moving_average(steps2, window_size)
+        plt.plot(range(window_size-1, len(steps1)), steps1_smooth, 
+                 label='High Exploration (Smoothed)')
+        plt.plot(range(window_size-1, len(steps2)), steps2_smooth, 
+                 label='Moderate Exploration (Smoothed)')
+    plt.plot(steps1, alpha=0.3, label='High Exploration: Raw')
+    plt.plot(steps2, alpha=0.3, label='Moderate Exploration: Raw')
     plt.xlabel('Episodes')
     plt.ylabel('Steps per Episode')
     plt.title('Steps per Episode Learning Curves')
     plt.legend()
     plt.savefig(f'{save_dir}steps_learning_curves.png')
+    plt.close()
+    
+    # Plot epsilon decay
+    plt.figure(figsize=(10, 5))
+    plt.plot(epsilons1, label='High Exploration: ε=1.0, decay=0.995')
+    plt.plot(epsilons2, label='Moderate Exploration: ε=0.5, decay=0.99')
+    plt.xlabel('Episodes')
+    plt.ylabel('Epsilon Value')
+    plt.title('Epsilon Decay Over Training')
+    plt.legend()
+    plt.savefig(f'{save_dir}epsilon_decay.png')
     plt.close()
 
 def main():
@@ -148,6 +180,7 @@ def main():
     parser.add_argument('-alpha', type=float, default=0.1, help='Learning rate')
     parser.add_argument('-gamma', type=float, default=0.9, help='Discount factor')
     parser.add_argument('-output_dir', type=str, default='', help='Directory to save output files')
+    parser.add_argument('-window_size', type=int, default=50, help='Window size for moving average smoothing')
     args = parser.parse_args()
 
     # Set random seeds for reproducibility
