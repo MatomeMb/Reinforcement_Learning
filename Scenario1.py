@@ -117,6 +117,29 @@ def show_final_path(fourRoomsObj, Q, save_path=None):
     print(f"Path completed in {steps} steps")
     fourRoomsObj.showPath(-1, savefig=save_path)
 
+def plot_learning_curves(rewards1, steps1, rewards2, steps2, save_dir=''):
+    # Plot rewards
+    plt.figure(figsize=(10, 5))
+    plt.plot(rewards1, label='High Exploration: ε=1.0, decay=0.995')
+    plt.plot(rewards2, label='Moderate Exploration: ε=0.5, decay=0.99')
+    plt.xlabel('Episodes')
+    plt.ylabel('Total Reward')
+    plt.title('Reward Learning Curves')
+    plt.legend()
+    plt.savefig(f'{save_dir}reward_learning_curves.png')
+    plt.close()
+    
+    # Plot steps per episode
+    plt.figure(figsize=(10, 5))
+    plt.plot(steps1, label='High Exploration: ε=1.0, decay=0.995')
+    plt.plot(steps2, label='Moderate Exploration: ε=0.5, decay=0.99')
+    plt.xlabel('Episodes')
+    plt.ylabel('Steps per Episode')
+    plt.title('Steps per Episode Learning Curves')
+    plt.legend()
+    plt.savefig(f'{save_dir}steps_learning_curves.png')
+    plt.close()
+
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 1: Simple Package Collection')
     parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
@@ -124,23 +147,33 @@ def main():
     parser.add_argument('-episodes', type=int, default=1000, help='Number of training episodes')
     parser.add_argument('-alpha', type=float, default=0.1, help='Learning rate')
     parser.add_argument('-gamma', type=float, default=0.9, help='Discount factor')
+    parser.add_argument('-output_dir', type=str, default='', help='Directory to save output files')
     args = parser.parse_args()
 
     # Set random seeds for reproducibility
     np.random.seed(args.seed)
     random.seed(args.seed)
 
+    # Ensure output directory ends with a slash if provided
+    output_dir = args.output_dir
+    if output_dir and not output_dir.endswith('/'):
+        output_dir += '/'
+
     fourRoomsObj = FourRooms('simple', stochastic=args.stochastic)
     Q1 = np.zeros((11, 11, 2, 4))  # x: 1-11, y: 1-11, k: 0-1, actions: 0-3
     Q2 = np.zeros((11, 11, 2, 4))
     
-    alpha, gamma, min_epsilon = 0.1, 0.9, 0.01
-    
     # Strategy 1: High exploration
-    rewards1, steps1, epsilons1 = train(fourRoomsObj, Q1, alpha, gamma, epsilon_start=1.0, epsilon_decay=0.995, min_epsilon=min_epsilon, seed=args.seed)
+    rewards1, steps1, epsilons1 = train(fourRoomsObj, Q1, args.alpha, args.gamma, 
+                                        epsilon_start=1.0, epsilon_decay=0.995, 
+                                        min_epsilon=0.01, episodes=args.episodes, 
+                                        seed=args.seed)
     
     # Strategy 2: Moderate exploration
-    rewards2, steps2, epsilons2 = train(fourRoomsObj, Q2, alpha, gamma, epsilon_start=0.5, epsilon_decay=0.99, min_epsilon=min_epsilon, seed=args.seed)
+    rewards2, steps2, epsilons2 = train(fourRoomsObj, Q2, args.alpha, args.gamma, 
+                                        epsilon_start=0.5, epsilon_decay=0.99, 
+                                        min_epsilon=0.01, episodes=args.episodes, 
+                                        seed=args.seed)
     
     # Evaluate both policies
     avg_reward1, avg_steps1 = evaluate_policy(fourRoomsObj, Q1, seed=args.seed)
@@ -150,24 +183,17 @@ def main():
     print(f"Moderate Exploration - Avg Reward: {avg_reward2:.2f}, Avg Steps: {avg_steps2:.2f}")
     
     # Visualize policies
-    visualize_policy(Q1, "High Exploration Policy", 'policy_high_exploration.png')
-    visualize_policy(Q2, "Moderate Exploration Policy", 'policy_moderate_exploration.png')
+    visualize_policy(Q1, "High Exploration Policy", f'{output_dir}policy_high_exploration.png')
+    visualize_policy(Q2, "Moderate Exploration Policy", f'{output_dir}policy_moderate_exploration.png')
     
     # Plot learning curves
-    plt.plot(rewards1, label='High Exploration: ε=1.0, decay=0.995')
-    plt.plot(rewards2, label='Moderate Exploration: ε=0.5, decay=0.99')
-    plt.xlabel('Episodes')
-    plt.ylabel('Total Reward')
-    plt.title('Learning Curves for Scenario 1')
-    plt.legend()
-    plt.savefig('learning_curves_scenario1.png')
-    plt.close()
+    plot_learning_curves(rewards1, steps1, rewards2, steps2, output_dir)
     
     # Show final paths
     print("Generating path visualization for high exploration strategy...")
-    show_final_path(fourRoomsObj, Q1, 'path_high_exploration.png')
+    show_final_path(fourRoomsObj, Q1, f'{output_dir}path_high_exploration.png')
     print("Generating path visualization for moderate exploration strategy...")
-    show_final_path(fourRoomsObj, Q2, 'path_moderate_exploration.png')
+    show_final_path(fourRoomsObj, Q2, f'{output_dir}path_moderate_exploration.png')
 
 if __name__ == "__main__":
     main()
