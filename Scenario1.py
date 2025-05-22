@@ -271,12 +271,13 @@ def main():
     parser.add_argument('-episodes', type=int, default=1000, help='Training episodes')
     parser.add_argument('-alpha', type=float, default=0.1, help='Learning rate')
     parser.add_argument('-gamma', type=float, default=0.9, help='Discount factor')
-    parser.add_argument('-output', type=str, default='results/', help='Output directory')
+    parser.add_argument('-output_dir', type=str, default='results/', help='Output directory')
+    parser.add_argument('-show_progress', action='store_true', help='Show training progress')
     parser.add_argument('-sensitivity', action='store_true', help='Run sensitivity analysis')
     args = parser.parse_args()
 
     # Setup environment and output
-    os.makedirs(args.output, exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
     env = FourRooms('simple', stochastic=args.stochastic)
     np.random.seed(args.seed)
     random.seed(args.seed)
@@ -287,14 +288,14 @@ def main():
         env, alpha=args.alpha, gamma=args.gamma,
         epsilon_start=1.0, epsilon_decay=0.995, min_epsilon=0.01, seed=args.seed
     )
-    rewards_high, steps_high, epsilons_high = agent_high.train(args.episodes)
+    rewards_high, steps_high, epsilons_high = agent_high.train(args.episodes, show_progress=args.show_progress)
 
     print("\n=== Training Moderate Exploration Strategy ===")
     agent_mod = QLearningAgent(
         env, alpha=args.alpha, gamma=args.gamma,
         epsilon_start=0.5, epsilon_decay=0.99, min_epsilon=0.01, seed=args.seed
     )
-    rewards_mod, steps_mod, epsilons_mod = agent_mod.train(args.episodes)
+    rewards_mod, steps_mod, epsilons_mod = agent_mod.train(args.episodes, show_progress=args.show_progress)
 
     # Evaluate policies
     avg_reward_high, avg_steps_high = agent_high.evaluate()
@@ -303,14 +304,14 @@ def main():
     print(f"Moderate Exploration: Avg Reward = {avg_reward_mod:.2f}, Avg Steps = {avg_steps_mod:.2f}")
 
     # Generate visualizations
-    visualize_policy(agent_high.Q, "High Exploration Policy", f"{args.output}policy_high.png")
-    visualize_policy(agent_mod.Q, "Moderate Exploration Policy", f"{args.output}policy_mod.png")
+    visualize_policy(agent_high.Q, "High Exploration Policy", f"{args.output_dir}policy_high.png")
+    visualize_policy(agent_mod.Q, "Moderate Exploration Policy", f"{args.output_dir}policy_mod.png")
     plot_learning_curves(rewards_high, steps_high, epsilons_high,
-                        rewards_mod, steps_mod, epsilons_mod, args.output)
+                        rewards_mod, steps_mod, epsilons_mod, args.output_dir)
     
     # Demonstrate final paths
-    show_final_path(env, agent_high.Q, f"{args.output}path_high.png")
-    show_final_path(env, agent_mod.Q, f"{args.output}path_mod.png")
+    show_final_path(env, agent_high.Q, f"{args.output_dir}path_high.png")
+    show_final_path(env, agent_mod.Q, f"{args.output_dir}path_mod.png")
 
     # Sensitivity analysis
     if args.sensitivity:
@@ -322,11 +323,11 @@ def main():
             'epsilon_decay': 0.995,
             'min_epsilon': 0.01
         }
-        sensitivity_analysis(env, 'alpha', [0.01, 0.05, 0.1, 0.2], fixed_params, output_dir=args.output)
-        sensitivity_analysis(env, 'gamma', [0.8, 0.9, 0.95, 0.99], fixed_params, output_dir=args.output)
+        sensitivity_analysis(env, 'alpha', [0.01, 0.05, 0.1, 0.2], fixed_params, output_dir=args.output_dir)
+        sensitivity_analysis(env, 'gamma', [0.8, 0.9, 0.95, 0.99], fixed_params, output_dir=args.output_dir)
 
     print("\n=== Training Complete ===")
-    print(f"Results saved to: {args.output}")
+    print(f"Results saved to: {args.output_dir}")
 
 if __name__ == "__main__":
     main()
