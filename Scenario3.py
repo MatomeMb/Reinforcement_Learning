@@ -113,8 +113,8 @@ class OrderedPackageAgent:
             
             while not self.env.isTerminal():
                 action = np.argmax(self.Q[state[0]-1, state[1]-1, k])
-                _, new_pos, new_packages, is_terminal = self.env.takeAction(action)
-                reward = 10 if _ > 0 and not (is_terminal and new_packages > 0) else -10 if is_terminal else -0.01
+                grid_type, new_pos, new_packages, is_terminal = self.env.takeAction(action)
+                reward = 10 if grid_type > 0 and not (is_terminal and new_packages > 0) else -10 if is_terminal else -0.01
                 episode_reward += reward
                 steps += 1
                 state, k = new_pos, new_packages
