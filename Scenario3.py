@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from FourRooms import FourRooms
 import random
 from tqdm import tqdm
+import os
 
 def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsilon, episodes=1000, seed=None):
     if seed is not None:
@@ -49,7 +50,7 @@ def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsil
     
     return rewards, steps, epsilons
 
-def evaluate_policy(fourRoomsObj, Q, num_episodes=10, seed=None):
+def evaluate_policy(fourRoomsObj, Q, episodes=10, seed=None):
     if seed is not None:
         np.random.seed(seed)
         random.seed(seed)
@@ -57,7 +58,7 @@ def evaluate_policy(fourRoomsObj, Q, num_episodes=10, seed=None):
     total_rewards = []
     total_steps = []
     
-    for _ in range(num_episodes):
+    for _ in range(episodes):
         fourRoomsObj.newEpoch()
         state = fourRoomsObj.getPosition()
         k = fourRoomsObj.getPackagesRemaining()
@@ -80,7 +81,7 @@ def evaluate_policy(fourRoomsObj, Q, num_episodes=10, seed=None):
     
     return np.mean(total_rewards), np.mean(total_steps)
 
-def visualize_policy(Q, title="Learned Policy for Scenario 3", save_path="policy_scenario3.png"):
+def visualize_policy(Q, save_path="policy_scenario3.png"):
     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
     action_symbols = ['↑', '↓', '←', '→']
     
@@ -104,7 +105,7 @@ def visualize_policy(Q, title="Learned Policy for Scenario 3", save_path="policy
         axes[k].set_yticklabels(np.arange(1, 12))
         axes[k].grid(False)
     
-    plt.suptitle(title)
+    plt.suptitle("Learned Policy for Scenario 3")
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
@@ -211,25 +212,33 @@ def main():
     parser.add_argument('-output_dir', type=str, default='', help='Directory to save output files')
     args = parser.parse_args()
     
-    # Create output directory if it doesn't exist
-    if args.output_dir and not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    # Ensure output directory exists and ends with a slash for consistency
+    output_dir = args.output_dir
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        if not output_dir.endswith('/'):
+            output_dir += '/'
     
     # Set random seeds for reproducibility
     np.random.seed(args.seed)
     random.seed(args.seed)
 
+    # Initialize FourRooms environment for Scenario 3
     fourRoomsObj = FourRooms('rgb', stochastic=args.stochastic)
-    Q = np.zeros((11, 11, 4, 4))  # x: 1-11, y: 1-11, k: 0-3, actions: 0-3
+    Q = np.zeros((11, 11, 4, 4))  # State space: x: 1-11, y: 1-11, k: 0-3, actions: 0-3
     
-    alpha, gamma = 0.1, 0.9
+    alpha, gamma = args.alpha, args.gamma
     
-    # Train with high exploration
+    # Train the Q-learning agent
     rewards, steps, epsilons = train(fourRoomsObj, Q, alpha, gamma, 
                                     epsilon_start=1.0, epsilon_decay=0.995, 
-                                    min_epsilon=0.01, seed=args.seed)
+                                    min_epsilon=0.01, episodes=args.episodes, seed=args.seed)
     
-    # Show final path
+    # Generate visualizations for learning curves and policy
+    plot_learning_curves(rewards, steps, epsilons, window_size=args.window_size, save_dir=output_dir)
+    visualize_policy(Q, save_path=f"{output_dir}policy_scenario3.png")
+    
+    # Demonstrate the final learned path
     fourRoomsObj.newEpoch()
     state = fourRoomsObj.getPosition()
     k = fourRoomsObj.getPackagesRemaining()
@@ -237,10 +246,10 @@ def main():
         action = np.argmax(Q[state[0]-1, state[1]-1, k])
         _, newPos, packagesRemaining, _ = fourRoomsObj.takeAction(action)
         state, k = newPos, packagesRemaining
-    fourRoomsObj.showPath(-1, savefig='path_scenario3.png')
-
-    # Evaluate policy
-    avg_reward, avg_steps = evaluate_policy(fourRoomsObj, Q, seed=args.seed)
+    fourRoomsObj.showPath(-1, savefig=f"{output_dir}path_scenario3.png")
+    
+    # Evaluate the learned policy
+    avg_reward, avg_steps = evaluate_policy(fourRoomsObj, Q, episodes=100, seed=args.seed)
     print(f"Average Reward: {avg_reward:.2f}, Average Steps: {avg_steps:.2f}")
 
 if __name__ == "__main__":
