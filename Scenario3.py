@@ -3,6 +3,7 @@ import argparse
 import matplotlib.pyplot as plt
 from FourRooms import FourRooms
 import random
+from tqdm import tqdm
 
 def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsilon, episodes=1000, seed=None):
     if seed is not None:
