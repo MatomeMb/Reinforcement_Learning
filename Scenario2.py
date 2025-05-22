@@ -6,326 +6,251 @@ import random
 from tqdm import tqdm
 import os
 
-def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsilon, episodes=1000, seed=None, show_progress=False):
-    """
-    Train the Q-learning agent for multiple package collection.
+class MultiPackageAgent:
+    """Q-learning agent for multiple package collection scenario."""
     
-    Args:
-        fourRoomsObj: FourRooms environment object
-        Q: Q-table to be updated
-        alpha: Learning rate
-        gamma: Discount factor
-        epsilon_start: Initial exploration rate
-        epsilon_decay: Decay rate for exploration
-        min_epsilon: Minimum exploration rate
-        episodes: Number of training episodes
-        seed: Random seed for reproducibility
-        show_progress: Whether to show progress bar
-    
-    Returns:
-        tuple: (rewards, steps, epsilons) for each episode
-    """
-    if seed is not None:
-        np.random.seed(seed)
-        random.seed(seed)
+    def __init__(self, env, alpha=0.1, gamma=0.9, epsilon_start=1.0, 
+                 epsilon_decay=0.995, min_epsilon=0.01, seed=None):
+        self.env = env
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon_start = epsilon_start
+        self.epsilon_decay = epsilon_decay
+        self.min_epsilon = min_epsilon
+        self.seed = seed
+        self.Q = np.zeros((11, 11, 5, 4))  # State space: (x, y, packages_remaining, action)
         
-    rewards = []
-    steps = []
-    epsilons = []
-    
-    # Create progress bar if requested
-    episode_iterator = tqdm(range(episodes), desc="Training Scenario 2", disable=not show_progress)
-    
-    for episode in episode_iterator:
-        fourRoomsObj.newEpoch()
-        state = fourRoomsObj.getPosition()
-        k = fourRoomsObj.getPackagesRemaining()
-        total_reward = 0
-        step_count = 0
-        epsilon = max(min_epsilon, epsilon_start * (epsilon_decay ** episode))
-        epsilons.append(epsilon)
-        
-        while not fourRoomsObj.isTerminal():
-            # Epsilon-greedy action selection
-            if np.random.rand() < epsilon:
-                action = np.random.randint(4)
-            else:
-                action = np.argmax(Q[state[0]-1, state[1]-1, k])
-            
-            # Take action and observe result
-            gridType, newPos, packagesRemaining, isTerminal = fourRoomsObj.takeAction(action)
-            
-            # Reward function: +1 for collecting package, -0.01 for each step
-            reward = 1 if gridType > 0 else -0.01
-            
-            total_reward += reward
-            step_count += 1
-            
-            # Q-learning update
-            next_state = newPos
-            next_k = packagesRemaining
-            max_next_Q = 0 if isTerminal else np.max(Q[next_state[0]-1, next_state[1]-1, next_k])
-            Q[state[0]-1, state[1]-1, k, action] += alpha * (reward + gamma * max_next_Q - Q[state[0]-1, state[1]-1, k, action])
-            
-            # Update state
-            state, k = next_state, next_k
-        
-        rewards.append(total_reward)
-        steps.append(step_count)
-        
-        # Update progress bar with current metrics
-        if show_progress:
-            episode_iterator.set_postfix({
-                'ε': f"{epsilon:.3f}",
-                'reward': f"{total_reward:.2f}",
-                'steps': step_count,
-                'avg_reward': f"{np.mean(rewards[-100:]):.2f}" if len(rewards) > 0 else "N/A"
-            })
-    
-    return rewards, steps, epsilons
+        if seed is not None:
+            np.random.seed(seed)
+            random.seed(seed)
 
-def evaluate_policy(fourRoomsObj, Q, episodes=100, seed=None):
-    """
-    Evaluate the learned policy over multiple episodes.
-    
-    Args:
-        fourRoomsObj: FourRooms environment object
-        Q: Trained Q-table
-        episodes: Number of evaluation episodes
-        seed: Random seed for reproducibility
-    
-    Returns:
-        tuple: (average_reward, average_steps)
-    """
-    if seed is not None:
-        np.random.seed(seed)
-        random.seed(seed)
-        
-    total_rewards = []
-    total_steps = []
-    
-    for _ in range(episodes):
-        fourRoomsObj.newEpoch()
-        state = fourRoomsObj.getPosition()
-        k = fourRoomsObj.getPackagesRemaining()
-        episode_reward = 0
-        steps = 0
-        
-        while not fourRoomsObj.isTerminal():
-            # Use greedy policy (no exploration)
-            action = np.argmax(Q[state[0]-1, state[1]-1, k])
-            gridType, newPos, packagesRemaining, _ = fourRoomsObj.takeAction(action)
-            reward = 1 if gridType > 0 else -0.01
-            episode_reward += reward
-            steps += 1
-            state, k = newPos, packagesRemaining
-        
-        total_rewards.append(episode_reward)
-        total_steps.append(steps)
-    
-    return np.mean(total_rewards), np.mean(total_steps)
+    def get_epsilon(self, episode):
+        """Calculate exponential decay epsilon value."""
+        return max(self.min_epsilon, self.epsilon_start * (self.epsilon_decay ** episode))
 
-def visualize_policy(Q, save_path="policy_scenario2.png"):
-    """
-    Visualize the learned policy as a heatmap with action arrows.
-    
-    Args:
-        Q: Trained Q-table
-        save_path: Path to save the visualization
-    """
+    def choose_action(self, state, packages_remaining, epsilon):
+        """Epsilon-greedy action selection."""
+        if np.random.rand() < epsilon:
+            return np.random.randint(4)  # Random action
+        return np.argmax(self.Q[state[0]-1, state[1]-1, packages_remaining])
+
+    def train(self, episodes=1000, show_progress=True):
+        """Train the agent through Q-learning."""
+        rewards = []
+        steps = []
+        epsilons = []
+        
+        iterator = tqdm(range(episodes), desc="Training Scenario 2", disable=not show_progress)
+        
+        for episode in iterator:
+            self.env.newEpoch()
+            state = self.env.getPosition()
+            k = self.env.getPackagesRemaining()
+            total_reward = 0
+            step_count = 0
+            epsilon = self.get_epsilon(episode)
+            epsilons.append(epsilon)
+            
+            while not self.env.isTerminal():
+                action = self.choose_action(state, k, epsilon)
+                grid_type, new_pos, new_packages, is_terminal = self.env.takeAction(action)
+                reward = 1 if grid_type > 0 else -0.01
+                
+                # Q-learning update
+                current_q = self.Q[state[0]-1, state[1]-1, k, action]
+                next_max_q = 0 if is_terminal else np.max(self.Q[new_pos[0]-1, new_pos[1]-1, new_packages])
+                self.Q[state[0]-1, state[1]-1, k, action] += self.alpha * (
+                    reward + self.gamma * next_max_q - current_q
+                )
+                
+                total_reward += reward
+                step_count += 1
+                state, k = new_pos, new_packages
+            
+            rewards.append(total_reward)
+            steps.append(step_count)
+            
+            if show_progress:
+                iterator.set_postfix({
+                    'ε': f"{epsilon:.3f}",
+                    'Reward': total_reward,
+                    'Steps': step_count,
+                    'Avg Reward': f"{np.mean(rewards[-100:]):.2f}"
+                })
+        
+        return rewards, steps, epsilons
+
+    def evaluate(self, episodes=100):
+        """Evaluate the learned policy."""
+        total_rewards = []
+        total_steps = []
+        
+        for _ in range(episodes):
+            self.env.newEpoch()
+            state = self.env.getPosition()
+            k = self.env.getPackagesRemaining()
+            episode_reward = 0
+            steps = 0
+            
+            while not self.env.isTerminal():
+                action = np.argmax(self.Q[state[0]-1, state[1]-1, k])
+                _, new_pos, new_packages, _ = self.env.takeAction(action)
+                reward = 1 if _ > 0 else -0.01
+                episode_reward += reward
+                steps += 1
+                state, k = new_pos, new_packages
+            
+            total_rewards.append(episode_reward)
+            total_steps.append(steps)
+        
+        return np.mean(total_rewards), np.mean(total_steps)
+
+def visualize_policy(agent, save_path="policy_scenario2.png"):
+    """Visualize the learned policy with heatmaps."""
+    Q = agent.Q
     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
     action_symbols = ['↑', '↓', '←', '→']
     
     for k in range(4):
-        policy = np.zeros((11, 11), dtype=object)
-        value = np.zeros((11, 11))
+        policy_grid = np.zeros((11, 11), dtype=object)
+        value_grid = np.zeros((11, 11))
         
         for i in range(11):
             for j in range(11):
                 best_action = np.argmax(Q[i, j, k])
-                policy[i, j] = action_symbols[best_action]
-                value[i, j] = np.max(Q[i, j, k])
-                
-        # Create heatmap
-        im = axes[k].imshow(value, cmap='viridis', aspect='equal')
+                policy_grid[i, j] = action_symbols[best_action]
+                value_grid[i, j] = np.max(Q[i, j, k])
+        
+        im = axes[k].imshow(value_grid, cmap='viridis')
+        axes[k].set_title(f"Packages Remaining: {k}")
         
         # Add action arrows
         for i in range(11):
             for j in range(11):
-                axes[k].text(j, i, policy[i, j], ha='center', va='center', 
-                            color='white', fontweight='bold', fontsize=8)
+                axes[k].text(j, i, policy_grid[i, j], 
+                          ha='center', va='center', 
+                          color='white', fontsize=8, fontweight='bold')
         
-        axes[k].set_title(f"Packages Remaining: {k}", fontsize=12)
-        axes[k].set_xticks(np.arange(11))
-        axes[k].set_yticks(np.arange(11))
-        axes[k].set_xticklabels(np.arange(1, 12))
-        axes[k].set_yticklabels(np.arange(1, 12))
-        axes[k].grid(False)
-        
-        # Add colorbar
-        plt.colorbar(im, ax=axes[k], shrink=0.8)
+        plt.colorbar(im, ax=axes[k], fraction=0.046, pad=0.04)
     
-    plt.suptitle("Learned Policy for Scenario 2: Multiple Package Collection", fontsize=16)
+    plt.suptitle("Learned Policy for Scenario 2: Multiple Package Collection")
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
 
-def moving_average(data, window_size):
-    """
-    Calculate the moving average of the data.
-    
-    Args:
-        data: List of values
-        window_size: Size of the moving window
-    
-    Returns:
-        List of moving averages
-    """
-    if len(data) < window_size:
-        return data
+def moving_average(data, window_size=50):
+    """Smooth data using moving average."""
     return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
 
-def plot_learning_curves(rewards, steps, epsilons, window_size=50, save_dir=""):
-    """
-    Plot learning curves for rewards, steps, and epsilon decay.
-    
-    Args:
-        rewards: List of rewards per episode
-        steps: List of steps per episode
-        epsilons: List of epsilon values per episode
-        window_size: Window size for moving average
-        save_dir: Directory to save the plots
-    """
+def plot_learning_curves(rewards, steps, epsilons, window_size=50, save_dir=''):
+    """Plot learning metrics."""
     # Plot rewards
     plt.figure(figsize=(12, 6))
-    plt.plot(rewards, alpha=0.3, color='blue', label='Raw Rewards')
-    if len(rewards) >= window_size:
-        rewards_smooth = moving_average(rewards, window_size)
-        plt.plot(range(window_size-1, len(rewards)), rewards_smooth, 
-                 color='blue', linewidth=2, label=f'Moving Average (window={window_size})')
-    plt.xlabel('Episodes', fontsize=12)
-    plt.ylabel('Total Reward', fontsize=12)
-    plt.title('Rewards per Episode - Scenario 2', fontsize=14)
+    plt.plot(rewards, alpha=0.3, label='Raw')
+    if len(rewards) > window_size:
+        smooth = moving_average(rewards, window_size)
+        plt.plot(range(window_size-1, len(rewards)), smooth, label='Smoothed', linewidth=2)
+    plt.xlabel('Episodes')
+    plt.ylabel('Reward')
+    plt.title('Reward Learning Curve')
     plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.savefig(f"{save_dir}reward_learning_curve.png", dpi=300, bbox_inches='tight')
+    plt.grid(alpha=0.3)
+    plt.savefig(f"{save_dir}reward_curve.png", dpi=300, bbox_inches='tight')
     plt.close()
     
     # Plot steps
     plt.figure(figsize=(12, 6))
-    plt.plot(steps, alpha=0.3, color='green', label='Raw Steps')
-    if len(steps) >= window_size:
-        steps_smooth = moving_average(steps, window_size)
-        plt.plot(range(window_size-1, len(steps)), steps_smooth, 
-                 color='green', linewidth=2, label=f'Moving Average (window={window_size})')
-    plt.xlabel('Episodes', fontsize=12)
-    plt.ylabel('Steps per Episode', fontsize=12)
-    plt.title('Steps per Episode - Scenario 2', fontsize=14)
+    plt.plot(steps, alpha=0.3, label='Raw')
+    if len(steps) > window_size:
+        smooth = moving_average(steps, window_size)
+        plt.plot(range(window_size-1, len(steps)), smooth, label='Smoothed', linewidth=2)
+    plt.xlabel('Episodes')
+    plt.ylabel('Steps')
+    plt.title('Efficiency Learning Curve')
     plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.savefig(f"{save_dir}steps_learning_curve.png", dpi=300, bbox_inches='tight')
+    plt.grid(alpha=0.3)
+    plt.savefig(f"{save_dir}steps_curve.png", dpi=300, bbox_inches='tight')
     plt.close()
     
     # Plot epsilon decay
     plt.figure(figsize=(12, 6))
-    plt.plot(epsilons, color='red', linewidth=2)
-    plt.xlabel('Episodes', fontsize=12)
-    plt.ylabel('Epsilon Value', fontsize=12)
-    plt.title('Epsilon Decay Over Training - Scenario 2', fontsize=14)
-    plt.grid(True, alpha=0.3)
+    plt.plot(epsilons)
+    plt.xlabel('Episodes')
+    plt.ylabel('Epsilon')
+    plt.title('Exploration Rate Decay')
+    plt.grid(alpha=0.3)
     plt.savefig(f"{save_dir}epsilon_decay.png", dpi=300, bbox_inches='tight')
     plt.close()
 
 def main():
-    parser = argparse.ArgumentParser(description='Q-learning for Scenario 2: Multiple Package Collection')
-    parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
-    parser.add_argument('-episodes', type=int, default=1000, help='Number of training episodes')
+    parser = argparse.ArgumentParser(description='Q-learning for Scenario 2: Multiple Packages')
+    parser.add_argument('-stochastic', action='store_true', help='Enable stochastic transitions')
+    parser.add_argument('-episodes', type=int, default=1000, help='Training episodes')
     parser.add_argument('-alpha', type=float, default=0.1, help='Learning rate')
     parser.add_argument('-gamma', type=float, default=0.9, help='Discount factor')
-    parser.add_argument('-seed', type=int, default=42, help='Random seed for reproducibility')
-    parser.add_argument('-window_size', type=int, default=50, help='Window size for moving average')
-    parser.add_argument('-show_progress', action='store_true', help='Show progress bar during training')
-    parser.add_argument('-output_dir', type=str, default='', help='Directory to save output files')
+    parser.add_argument('-seed', type=int, default=42, help='Random seed')
+    parser.add_argument('-output_dir', type=str, default='results/', help='Output directory')
+    parser.add_argument('-show_progress', action='store_true', help='Show training progress')
+    parser.add_argument('-window_size', type=int, default=50, help='Smoothing window size')
     args = parser.parse_args()
-    
-    # Ensure output directory exists and ends with a slash for consistency
-    output_dir = args.output_dir
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-        if not output_dir.endswith('/'):
-            output_dir += '/'
-    
-    # Set random seeds for reproducibility
+
+    # Setup environment and output
+    os.makedirs(args.output_dir, exist_ok=True)
     np.random.seed(args.seed)
     random.seed(args.seed)
+    env = FourRooms('multi', stochastic=args.stochastic)
 
-    print("=" * 50)
-    print("Q-LEARNING FOR SCENARIO 2: MULTIPLE PACKAGE COLLECTION")
-    print("=" * 50)
-    print(f"Configuration:")
-    print(f"  - Episodes: {args.episodes}")
-    print(f"  - Learning Rate (α): {args.alpha}")
-    print(f"  - Discount Factor (γ): {args.gamma}")
-    print(f"  - Stochastic Environment: {args.stochastic}")
-    print(f"  - Random Seed: {args.seed}")
-    print(f"  - Output Directory: {output_dir if output_dir else 'Current directory'}")
-    print("-" * 50)
+    print("\n=== Initializing Multi-Package Agent ===")
+    agent = MultiPackageAgent(
+        env,
+        alpha=args.alpha,
+        gamma=args.gamma,
+        epsilon_start=1.0,
+        epsilon_decay=0.995,
+        min_epsilon=0.01,
+        seed=args.seed
+    )
 
-    # Initialize FourRooms environment for Scenario 2
-    fourRoomsObj = FourRooms('multi', stochastic=args.stochastic)
-    Q = np.zeros((11, 11, 5, 4))  # State space: x: 1-11, y: 1-11, k: 0-4, actions: 0-3
-    
-    # Train the Q-learning agent
-    print("Starting training...")
-    rewards, steps, epsilons = train(fourRoomsObj, Q, args.alpha, args.gamma, 
-                                    epsilon_start=1.0, epsilon_decay=0.995, 
-                                    min_epsilon=0.01, episodes=args.episodes, 
-                                    seed=args.seed, show_progress=args.show_progress)
-    
-    print(f"Training completed!")
-    print(f"Final epsilon: {epsilons[-1]:.4f}")
-    print(f"Average reward (last 100 episodes): {np.mean(rewards[-100:]):.2f}")
-    print(f"Average steps (last 100 episodes): {np.mean(steps[-100:]):.2f}")
-    
-    # Generate visualizations for learning curves and policy
-    print("Generating learning curve visualizations...")
-    plot_learning_curves(rewards, steps, epsilons, window_size=args.window_size, save_dir=output_dir)
-    
-    print("Generating policy visualization...")
-    visualize_policy(Q, save_path=f"{output_dir}policy_scenario2.png")
-    
-    # Evaluate the learned policy
-    print("Evaluating learned policy...")
-    avg_reward, avg_steps = evaluate_policy(fourRoomsObj, Q, episodes=100, seed=args.seed)
-    print(f"Policy Evaluation Results:")
+    print("\n=== Training Started ===")
+    rewards, steps, epsilons = agent.train(args.episodes, args.show_progress)
+
+    print("\n=== Training Completed ===")
+    print(f"Final Epsilon: {epsilons[-1]:.4f}")
+    print(f"Average Reward (Last 100): {np.mean(rewards[-100:]):.2f}")
+    print(f"Average Steps (Last 100): {np.mean(steps[-100:]):.2f}")
+
+    # Generate visualizations
+    print("\n=== Generating Visualizations ===")
+    plot_learning_curves(rewards, steps, epsilons, 
+                        window_size=args.window_size, 
+                        save_dir=args.output_dir)
+    visualize_policy(agent, f"{args.output_dir}policy_scenario2.png")
+
+    # Evaluate policy
+    print("\n=== Evaluating Policy ===")
+    avg_reward, avg_steps = agent.evaluate()
+    print(f"Evaluation Results (100 episodes):")
     print(f"  - Average Reward: {avg_reward:.2f}")
     print(f"  - Average Steps: {avg_steps:.2f}")
+
+    # Save final path
+    print("\n=== Generating Final Path ===")
+    env.newEpoch()
+    state = env.getPosition()
+    k = env.getPackagesRemaining()
+    steps = 0
     
-    # Demonstrate the final learned path
-    print("Generating final path demonstration...")
-    fourRoomsObj.newEpoch()
-    state = fourRoomsObj.getPosition()
-    k = fourRoomsObj.getPackagesRemaining()
-    path_steps = 0
+    while not env.isTerminal():
+        action = np.argmax(agent.Q[state[0]-1, state[1]-1, k])
+        _, new_pos, new_packages, _ = env.takeAction(action)
+        state, k = new_pos, new_packages
+        steps += 1
     
-    while not fourRoomsObj.isTerminal():
-        action = np.argmax(Q[state[0]-1, state[1]-1, k])
-        _, newPos, packagesRemaining, _ = fourRoomsObj.takeAction(action)
-        state, k = newPos, packagesRemaining
-        path_steps += 1
-    
-    fourRoomsObj.showPath(-1, savefig=f"{output_dir}path_scenario2.png")
-    print(f"Final path completed in {path_steps} steps")
-    
-    print("=" * 50)
-    print("SCENARIO 2 COMPLETED SUCCESSFULLY!")
-    print("Generated files:")
-    print(f"  - {output_dir}reward_learning_curve.png")
-    print(f"  - {output_dir}steps_learning_curve.png")
-    print(f"  - {output_dir}epsilon_decay.png")
-    print(f"  - {output_dir}policy_scenario2.png")
-    print(f"  - {output_dir}path_scenario2.png")
-    print("=" * 50)
+    env.showPath(-1, savefig=f"{args.output_dir}path_scenario2.png")
+    print(f"Final path completed in {steps} steps")
+
+    print("\n=== Scenario 2 Completed Successfully ===")
+    print(f"Output files saved to: {args.output_dir}")
 
 if __name__ == "__main__":
     main()
