@@ -94,8 +94,8 @@ class MultiPackageAgent:
             
             while not self.env.isTerminal():
                 action = np.argmax(self.Q[state[0]-1, state[1]-1, k])
-                _, new_pos, new_packages, _ = self.env.takeAction(action)
-                reward = 1 if _ > 0 else -0.01
+                grid_type, new_pos, new_packages, _ = self.env.takeAction(action)
+                reward = 1 if grid_type > 0 else -0.01
                 episode_reward += reward
                 steps += 1
                 state, k = new_pos, new_packages
