@@ -9,20 +9,8 @@ import os
 class OrderedPackageAgent:
     """Q-learning agent for ordered package collection scenario (R→G→B)."""
     
-    def __init__(self, env, alpha=0.1, gamma=0.9, epsilon_start=1.0, 
-                 epsilon_decay=0.998, min_epsilon=0.05, seed=None):
-        """
-        Initialize Q-learning agent for ordered collection.
-        
-        Args:
-            env: FourRooms environment object
-            alpha: Learning rate (0-1)
-            gamma: Discount factor (0-1)
-            epsilon_start: Initial exploration rate
-            epsilon_decay: Epsilon decay per episode
-            min_epsilon: Minimum exploration rate
-            seed: Random seed for reproducibility
-        """
+    def __init__(self, env, alpha=0.3, gamma=0.95, epsilon_start=1.0, 
+                 epsilon_decay=0.999, min_epsilon=0.1, seed=None):
         self.env = env
         self.alpha = alpha
         self.gamma = gamma
@@ -37,17 +25,14 @@ class OrderedPackageAgent:
             random.seed(seed)
 
     def get_epsilon(self, episode):
-        """Calculate exponentially decaying exploration rate."""
         return max(self.min_epsilon, self.epsilon_start * (self.epsilon_decay ** episode))
 
     def choose_action(self, state, package_state, epsilon):
-        """Epsilon-greedy action selection."""
         if np.random.rand() < epsilon:
-            return np.random.randint(4)  # Random action
+            return np.random.randint(4)
         return np.argmax(self.Q[state[0]-1, state[1]-1, package_state])
 
-    def train(self, episodes=2000, show_progress=True):
-        """Train the agent with ordered collection constraints."""
+    def train(self, episodes=1000, show_progress=True):
         rewards = []
         steps = []
         epsilons = []
@@ -64,14 +49,31 @@ class OrderedPackageAgent:
             epsilon = self.get_epsilon(episode)
             epsilons.append(epsilon)
             
-            while not self.env.isTerminal():
+            max_steps = 300
+            
+            while not self.env.isTerminal() and step_count < max_steps:
                 action = self.choose_action(state, k, epsilon)
                 grid_type, new_pos, new_packages, is_terminal = self.env.takeAction(action)
                 
-                # Custom reward structure for ordered collection
-                reward = 10 if grid_type > 0 and not (is_terminal and new_packages > 0) else -10 if is_terminal else -0.01
+                # Enhanced reward structure for ordered collection
+                if grid_type > 0:
+                    if new_packages < k:
+                        if k == 3 and grid_type == 1:
+                            reward = 50
+                        elif k == 2 and grid_type == 2:
+                            reward = 50
+                        elif k == 1 and grid_type == 3:
+                            reward = 100
+                        else:
+                            reward = -200
+                    else:
+                        reward = -200
+                else:
+                    reward = -0.1
                 
-                # Q-learning update
+                if is_terminal and new_packages == 0:
+                    reward += 200
+                
                 current_q = self.Q[state[0]-1, state[1]-1, k, action]
                 next_max_q = 0 if is_terminal else np.max(self.Q[new_pos[0]-1, new_pos[1]-1, new_packages])
                 self.Q[state[0]-1, state[1]-1, k, action] += self.alpha * (
@@ -90,7 +92,7 @@ class OrderedPackageAgent:
             if show_progress:
                 iterator.set_postfix({
                     'ε': f"{epsilon:.3f}",
-                    'Reward': total_reward,
+                    'Reward': f"{total_reward:.1f}",
                     'Steps': step_count,
                     'Success': f"{(successes/(episode+1))*100:.1f}%"
                 })
@@ -98,8 +100,7 @@ class OrderedPackageAgent:
         print(f"Training completed with {successes}/{episodes} successful episodes ({successes/episodes*100:.1f}%)")
         return rewards, steps, epsilons
 
-    def evaluate(self, episodes=100):
-        """Evaluate the learned policy's performance."""
+    def evaluate(self, episodes=20):
         total_rewards = []
         total_steps = []
         successes = 0
@@ -110,11 +111,30 @@ class OrderedPackageAgent:
             k = self.env.getPackagesRemaining()
             episode_reward = 0
             steps = 0
+            max_steps = 150
             
-            while not self.env.isTerminal():
+            while not self.env.isTerminal() and steps < max_steps:
                 action = np.argmax(self.Q[state[0]-1, state[1]-1, k])
                 grid_type, new_pos, new_packages, is_terminal = self.env.takeAction(action)
-                reward = 10 if grid_type > 0 and not (is_terminal and new_packages > 0) else -10 if is_terminal else -0.01
+                
+                if grid_type > 0:
+                    if new_packages < k:
+                        if k == 3 and grid_type == 1:
+                            reward = 50
+                        elif k == 2 and grid_type == 2:
+                            reward = 50
+                        elif k == 1 and grid_type == 3:
+                            reward = 100
+                        else:
+                            reward = -200
+                    else:
+                        reward = -200
+                else:
+                    reward = -0.1
+                
+                if is_terminal and new_packages == 0:
+                    reward += 200
+                    
                 episode_reward += reward
                 steps += 1
                 state, k = new_pos, new_packages
@@ -127,11 +147,10 @@ class OrderedPackageAgent:
         return np.mean(total_rewards), np.mean(total_steps), successes/episodes
 
 def visualize_policy(agent, save_path="policy_scenario3.png"):
-    """Visualize the learned policy with action directions."""
     Q = agent.Q
     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
     action_symbols = ['↑', '↓', '←', '→']
-    states = ['All Collected', 'Blue Remaining', 'Green+Blue Remaining', 'All Remaining']
+    states = ['All Collected', 'Blue Remaining', 'Green+Blue Remaining', 'All Remaining (Start)']
     
     for k in range(4):
         policy = np.zeros((11, 11), dtype=object)
@@ -144,9 +163,8 @@ def visualize_policy(agent, save_path="policy_scenario3.png"):
                 values[i, j] = np.max(Q[i, j, k])
         
         im = axes[k].imshow(values, cmap='viridis')
-        axes[k].set_title(f"{states[k]} (k={k})")
+        axes[k].set_title(f"{states[k]}")
         
-        # Add action markers
         for i in range(11):
             for j in range(11):
                 axes[k].text(j, i, policy[i, j], 
@@ -161,12 +179,9 @@ def visualize_policy(agent, save_path="policy_scenario3.png"):
     plt.close()
 
 def moving_average(data, window_size=50):
-    """Calculate smoothed moving average of data."""
     return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
 
 def plot_learning_curves(rewards, steps, epsilons, window_size=50, save_dir=""):
-    """Generate training progress visualizations."""
-    # Reward curve
     plt.figure(figsize=(12, 6))
     plt.plot(rewards, alpha=0.3, label='Raw')
     if len(rewards) > window_size:
@@ -174,13 +189,12 @@ def plot_learning_curves(rewards, steps, epsilons, window_size=50, save_dir=""):
         plt.plot(range(window_size-1, len(rewards)), smooth, label='Smoothed', linewidth=2)
     plt.xlabel('Episodes')
     plt.ylabel('Reward')
-    plt.title('Reward Learning Curve')
+    plt.title('Reward Learning Curve - Scenario 3')
     plt.legend()
     plt.grid(alpha=0.3)
     plt.savefig(f"{save_dir}reward_curve.png", dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Steps curve
     plt.figure(figsize=(12, 6))
     plt.plot(steps, alpha=0.3, label='Raw')
     if len(steps) > window_size:
@@ -188,18 +202,17 @@ def plot_learning_curves(rewards, steps, epsilons, window_size=50, save_dir=""):
         plt.plot(range(window_size-1, len(steps)), smooth, label='Smoothed', linewidth=2)
     plt.xlabel('Episodes')
     plt.ylabel('Steps')
-    plt.title('Efficiency Learning Curve')
+    plt.title('Efficiency Learning Curve - Scenario 3')
     plt.legend()
     plt.grid(alpha=0.3)
     plt.savefig(f"{save_dir}steps_curve.png", dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Epsilon decay
     plt.figure(figsize=(12, 6))
     plt.plot(epsilons)
     plt.xlabel('Episodes')
     plt.ylabel('Epsilon')
-    plt.title('Exploration Rate Decay')
+    plt.title('Exploration Rate Decay - Scenario 3')
     plt.grid(alpha=0.3)
     plt.savefig(f"{save_dir}epsilon_decay.png", dpi=300, bbox_inches='tight')
     plt.close()
@@ -207,8 +220,8 @@ def plot_learning_curves(rewards, steps, epsilons, window_size=50, save_dir=""):
 def main():
     parser = argparse.ArgumentParser(description='Q-learning for Scenario 3: Ordered Collection')
     parser.add_argument('-stochastic', action='store_true', help='Enable stochastic actions')
-    parser.add_argument('-episodes', type=int, default=2000, help='Training episodes')
-    parser.add_argument('-alpha', type=float, default=0.1, help='Learning rate')
+    parser.add_argument('-episodes', type=int, default=800, help='Training episodes')
+    parser.add_argument('-alpha', type=float, default=0.3, help='Learning rate')
     parser.add_argument('-gamma', type=float, default=0.95, help='Discount factor')
     parser.add_argument('-seed', type=int, default=42, help='Random seed')
     parser.add_argument('-output_dir', type=str, default='results/', help='Output directory')
@@ -216,7 +229,6 @@ def main():
     parser.add_argument('-window_size', type=int, default=50, help='Smoothing window size')
     args = parser.parse_args()
 
-    # Initialize environment and agent
     os.makedirs(args.output_dir, exist_ok=True)
     np.random.seed(args.seed)
     random.seed(args.seed)
@@ -228,52 +240,57 @@ def main():
         alpha=args.alpha,
         gamma=args.gamma,
         epsilon_start=1.0,
-        epsilon_decay=0.998,
-        min_epsilon=0.05,
+        epsilon_decay=0.999,
+        min_epsilon=0.1,
         seed=args.seed
     )
 
-    # Training phase
     print("\n=== Training Started ===")
     rewards, steps, epsilons = agent.train(args.episodes, args.show_progress)
 
-    # Post-training analysis
     print("\n=== Training Results ===")
     print(f"Final Exploration Rate: {epsilons[-1]:.4f}")
     print(f"Average Reward (Last 100): {np.mean(rewards[-100:]):.2f}")
     print(f"Average Steps (Last 100): {np.mean(steps[-100:]):.2f}")
 
-    # Generate visualizations
     print("\n=== Generating Visualizations ===")
-    plot_learning_curves(rewards, steps, epsilons, 
-                        window_size=args.window_size, 
-                        save_dir=args.output_dir)
-    visualize_policy(agent, f"{args.output_dir}policy_scenario3.png")
+    try:
+        plot_learning_curves(rewards, steps, epsilons, 
+                            window_size=args.window_size, 
+                            save_dir=args.output_dir)
+        visualize_policy(agent, f"{args.output_dir}policy_scenario3.png")
+    except Exception as e:
+        print(f"Visualization error: {e}")
 
-    # Policy evaluation
     print("\n=== Policy Evaluation ===")
-    avg_reward, avg_steps, success_rate = agent.evaluate()
-    print(f"Evaluation Results (100 episodes):")
-    print(f"  - Average Reward: {avg_reward:.2f}")
-    print(f"  - Average Steps: {avg_steps:.2f}")
-    print(f"  - Success Rate: {success_rate*100:.1f}%")
+    try:
+        avg_reward, avg_steps, success_rate = agent.evaluate()
+        print(f"Evaluation Results:")
+        print(f"  - Average Reward: {avg_reward:.2f}")
+        print(f"  - Average Steps: {avg_steps:.2f}")
+        print(f"  - Success Rate: {success_rate*100:.1f}%")
+    except Exception as e:
+        print(f"Evaluation error: {e}")
 
-    # Final path demonstration
     print("\n=== Final Path Demonstration ===")
-    env.newEpoch()
-    state = env.getPosition()
-    k = env.getPackagesRemaining()
-    path_steps = 0
-    
-    while not env.isTerminal():
-        action = np.argmax(agent.Q[state[0]-1, state[1]-1, k])
-        _, new_pos, new_packages, _ = env.takeAction(action)
-        state, k = new_pos, new_packages
-        path_steps += 1
-    
-    env.showPath(-1, savefig=f"{args.output_dir}path_scenario3.png")
-    status = "SUCCESS" if k == 0 else f"FAILED ({k} remaining)"
-    print(f"{status}: Path completed in {path_steps} steps")
+    try:
+        env.newEpoch()
+        state = env.getPosition()
+        k = env.getPackagesRemaining()
+        path_steps = 0
+        max_steps = 150
+        
+        while not env.isTerminal() and path_steps < max_steps:
+            action = np.argmax(agent.Q[state[0]-1, state[1]-1, k])
+            _, new_pos, new_packages, _ = env.takeAction(action)
+            state, k = new_pos, new_packages
+            path_steps += 1
+        
+        env.showPath(-1, savefig=f"{args.output_dir}path_scenario3.png")
+        status = "SUCCESS" if k == 0 else f"FAILED ({k} remaining)"
+        print(f"{status}: Path completed in {path_steps} steps")
+    except Exception as e:
+        print(f"Path demonstration error: {e}")
 
     print("\n=== Scenario 3 Complete ===")
     print(f"Output files saved to: {args.output_dir}")

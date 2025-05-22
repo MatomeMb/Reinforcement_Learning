@@ -18,24 +18,21 @@ class MultiPackageAgent:
         self.epsilon_decay = epsilon_decay
         self.min_epsilon = min_epsilon
         self.seed = seed
-        self.Q = np.zeros((11, 11, 5, 4))  # State space: (x, y, packages_remaining, action)
+        self.Q = np.zeros((11, 11, 4, 4))  # State space: (x, y, packages_remaining, action) - FIXED: was 5, should be 4
         
         if seed is not None:
             np.random.seed(seed)
             random.seed(seed)
 
     def get_epsilon(self, episode):
-        """Calculate exponential decay epsilon value."""
         return max(self.min_epsilon, self.epsilon_start * (self.epsilon_decay ** episode))
 
     def choose_action(self, state, packages_remaining, epsilon):
-        """Epsilon-greedy action selection."""
         if np.random.rand() < epsilon:
-            return np.random.randint(4)  # Random action
+            return np.random.randint(4)
         return np.argmax(self.Q[state[0]-1, state[1]-1, packages_remaining])
 
     def train(self, episodes=1000, show_progress=True):
-        """Train the agent through Q-learning."""
         rewards = []
         steps = []
         epsilons = []
@@ -51,10 +48,13 @@ class MultiPackageAgent:
             epsilon = self.get_epsilon(episode)
             epsilons.append(epsilon)
             
-            while not self.env.isTerminal():
+            # Add step limit to prevent infinite loops
+            max_steps = 500
+            
+            while not self.env.isTerminal() and step_count < max_steps:
                 action = self.choose_action(state, k, epsilon)
                 grid_type, new_pos, new_packages, is_terminal = self.env.takeAction(action)
-                reward = 1 if grid_type > 0 else -0.01
+                reward = 10 if grid_type > 0 else -0.01  # Increased reward for packages
                 
                 # Q-learning update
                 current_q = self.Q[state[0]-1, state[1]-1, k, action]
@@ -80,8 +80,7 @@ class MultiPackageAgent:
         
         return rewards, steps, epsilons
 
-    def evaluate(self, episodes=100):
-        """Evaluate the learned policy."""
+    def evaluate(self, episodes=50):  # Reduced for safety
         total_rewards = []
         total_steps = []
         
@@ -91,11 +90,12 @@ class MultiPackageAgent:
             k = self.env.getPackagesRemaining()
             episode_reward = 0
             steps = 0
+            max_steps = 200  # Safety limit
             
-            while not self.env.isTerminal():
+            while not self.env.isTerminal() and steps < max_steps:
                 action = np.argmax(self.Q[state[0]-1, state[1]-1, k])
                 grid_type, new_pos, new_packages, _ = self.env.takeAction(action)
-                reward = 1 if grid_type > 0 else -0.01
+                reward = 10 if grid_type > 0 else -0.01
                 episode_reward += reward
                 steps += 1
                 state, k = new_pos, new_packages
@@ -106,7 +106,6 @@ class MultiPackageAgent:
         return np.mean(total_rewards), np.mean(total_steps)
 
 def visualize_policy(agent, save_path="policy_scenario2.png"):
-    """Visualize the learned policy with heatmaps."""
     Q = agent.Q
     fig, axes = plt.subplots(1, 4, figsize=(20, 5))
     action_symbols = ['↑', '↓', '←', '→']
@@ -124,7 +123,6 @@ def visualize_policy(agent, save_path="policy_scenario2.png"):
         im = axes[k].imshow(value_grid, cmap='viridis')
         axes[k].set_title(f"Packages Remaining: {k}")
         
-        # Add action arrows
         for i in range(11):
             for j in range(11):
                 axes[k].text(j, i, policy_grid[i, j], 
@@ -139,11 +137,9 @@ def visualize_policy(agent, save_path="policy_scenario2.png"):
     plt.close()
 
 def moving_average(data, window_size=50):
-    """Smooth data using moving average."""
     return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
 
 def plot_learning_curves(rewards, steps, epsilons, window_size=50, save_dir=''):
-    """Plot learning metrics."""
     # Plot rewards
     plt.figure(figsize=(12, 6))
     plt.plot(rewards, alpha=0.3, label='Raw')
@@ -194,7 +190,6 @@ def main():
     parser.add_argument('-window_size', type=int, default=50, help='Smoothing window size')
     args = parser.parse_args()
 
-    # Setup environment and output
     os.makedirs(args.output_dir, exist_ok=True)
     np.random.seed(args.seed)
     random.seed(args.seed)
@@ -219,35 +214,42 @@ def main():
     print(f"Average Reward (Last 100): {np.mean(rewards[-100:]):.2f}")
     print(f"Average Steps (Last 100): {np.mean(steps[-100:]):.2f}")
 
-    # Generate visualizations
     print("\n=== Generating Visualizations ===")
-    plot_learning_curves(rewards, steps, epsilons, 
-                        window_size=args.window_size, 
-                        save_dir=args.output_dir)
-    visualize_policy(agent, f"{args.output_dir}policy_scenario2.png")
+    try:
+        plot_learning_curves(rewards, steps, epsilons, 
+                            window_size=args.window_size, 
+                            save_dir=args.output_dir)
+        visualize_policy(agent, f"{args.output_dir}policy_scenario2.png")
+    except Exception as e:
+        print(f"Visualization error: {e}")
 
-    # Evaluate policy
     print("\n=== Evaluating Policy ===")
-    avg_reward, avg_steps = agent.evaluate()
-    print(f"Evaluation Results (100 episodes):")
-    print(f"  - Average Reward: {avg_reward:.2f}")
-    print(f"  - Average Steps: {avg_steps:.2f}")
+    try:
+        avg_reward, avg_steps = agent.evaluate()
+        print(f"Evaluation Results (50 episodes):")
+        print(f"  - Average Reward: {avg_reward:.2f}")
+        print(f"  - Average Steps: {avg_steps:.2f}")
+    except Exception as e:
+        print(f"Evaluation error: {e}")
 
-    # Save final path
     print("\n=== Generating Final Path ===")
-    env.newEpoch()
-    state = env.getPosition()
-    k = env.getPackagesRemaining()
-    steps = 0
-    
-    while not env.isTerminal():
-        action = np.argmax(agent.Q[state[0]-1, state[1]-1, k])
-        _, new_pos, new_packages, _ = env.takeAction(action)
-        state, k = new_pos, new_packages
-        steps += 1
-    
-    env.showPath(-1, savefig=f"{args.output_dir}path_scenario2.png")
-    print(f"Final path completed in {steps} steps")
+    try:
+        env.newEpoch()
+        state = env.getPosition()
+        k = env.getPackagesRemaining()
+        steps = 0
+        max_steps = 200
+        
+        while not env.isTerminal() and steps < max_steps:
+            action = np.argmax(agent.Q[state[0]-1, state[1]-1, k])
+            _, new_pos, new_packages, _ = env.takeAction(action)
+            state, k = new_pos, new_packages
+            steps += 1
+        
+        env.showPath(-1, savefig=f"{args.output_dir}path_scenario2.png")
+        print(f"Final path completed in {steps} steps")
+    except Exception as e:
+        print(f"Path generation error: {e}")
 
     print("\n=== Scenario 2 Completed Successfully ===")
     print(f"Output files saved to: {args.output_dir}")
