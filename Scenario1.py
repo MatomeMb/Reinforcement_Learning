@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from FourRooms import FourRooms
 import random
 from tqdm import tqdm
+import os
 
 def train(fourRoomsObj, Q, alpha, gamma, epsilon_start, epsilon_decay, min_epsilon, episodes=1000, seed=None, show_progress=True):
     if seed is not None:
@@ -296,10 +297,12 @@ def main():
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    # Ensure output directory ends with a slash if provided
+    # Ensure output directory exists
     output_dir = args.output_dir
-    if output_dir and not output_dir.endswith('/'):
-        output_dir += '/'
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        if not output_dir.endswith('/'):
+            output_dir += '/'
 
     fourRoomsObj = FourRooms('simple', stochastic=args.stochastic)
     Q1 = np.zeros((11, 11, 2, 4))  # x: 1-11, y: 1-11, k: 0-1, actions: 0-3
