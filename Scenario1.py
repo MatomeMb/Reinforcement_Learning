@@ -289,6 +289,7 @@ def main():
     parser.add_argument('-output_dir', type=str, default='', help='Directory to save output files')
     parser.add_argument('-window_size', type=int, default=50, help='Window size for moving average smoothing')
     parser.add_argument('-sensitivity_analysis', action='store_true', help='Perform hyperparameter sensitivity analysis')
+    parser.add_argument('-show_progress', action='store_true', help='Show progress bar during training')
     args = parser.parse_args()
 
     # Set random seeds for reproducibility
@@ -314,7 +315,7 @@ def main():
     rewards2, steps2, epsilons2 = train(fourRoomsObj, Q2, args.alpha, args.gamma, 
                                         epsilon_start=0.5, epsilon_decay=0.99, 
                                         min_epsilon=0.01, episodes=args.episodes, 
-                                        seed=args.seed)
+                                        seed=args.seed, show_progress=args.show_progress)
     
     # Evaluate both policies
     avg_reward1, avg_steps1 = evaluate_policy(fourRoomsObj, Q1, seed=args.seed)
@@ -348,7 +349,7 @@ def main():
         rewards, steps, _ = train(fourRoomsObj, Q_gammas[i], args.alpha, gamma, 
                                 epsilon_start=1.0, epsilon_decay=0.995, 
                                 min_epsilon=0.01, episodes=args.episodes, 
-                                seed=args.seed)
+                                seed=args.seed, show_progress=args.show_progress)
         rewards_gammas.append(rewards)
         steps_gammas.append(steps)
         
