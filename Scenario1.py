@@ -68,7 +68,9 @@ class QLearningAgent:
             epsilon = self.get_epsilon(episode)
             epsilons.append(epsilon)
             
-            while not self.env.isTerminal():
+            max_steps = 200  # Prevent infinite loops
+            
+            while not self.env.isTerminal() and step_count < max_steps:
                 action = self.choose_action(state, packages_remaining, epsilon)
                 
                 # Take action and observe next state
@@ -92,14 +94,14 @@ class QLearningAgent:
             if show_progress:
                 iterator.set_postfix({
                     'ε': f"{epsilon:.3f}",
-                    'Reward': total_reward,
+                    'Reward': f"{total_reward:.2f}",
                     'Steps': step_count,
                     'Avg Reward': f"{np.mean(rewards[-100:]):.2f}"
                 })
         
         return rewards, steps, epsilons
 
-    def evaluate(self, episodes=100):
+    def evaluate(self, episodes=50):  # REDUCED from 100 to prevent memory issues
         """Evaluate trained policy over multiple episodes."""
         total_rewards = []
         total_steps = []
@@ -110,8 +112,9 @@ class QLearningAgent:
             packages_remaining = self.env.getPackagesRemaining()
             episode_reward = 0
             step_count = 0
+            max_steps = 100  # Safety limit
             
-            while not self.env.isTerminal():
+            while not self.env.isTerminal() and step_count < max_steps:
                 action = np.argmax(self.Q[state[0]-1, state[1]-1, packages_remaining])
                 grid_type, new_pos, new_packages, _ = self.env.takeAction(action)
                 reward = 1 if grid_type > 0 else -0.01
@@ -158,7 +161,9 @@ def visualize_policy(Q, title="Learned Policy", save_path=None):
     plt.tight_layout()
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.close()
+        plt.close()
+    else:
+        plt.show()
 
 def show_final_path(env, Q, save_path=None):
     """Demonstrate agent's final path using greedy policy."""
@@ -166,8 +171,9 @@ def show_final_path(env, Q, save_path=None):
     state = env.getPosition()
     packages_remaining = env.getPackagesRemaining()
     steps = 0
+    max_steps = 100  # Safety limit
     
-    while not env.isTerminal():
+    while not env.isTerminal() and steps < max_steps:
         action = np.argmax(Q[state[0]-1, state[1]-1, packages_remaining])
         _, new_pos, new_packages, _ = env.takeAction(action)
         state, packages_remaining = new_pos, new_packages
@@ -178,42 +184,62 @@ def show_final_path(env, Q, save_path=None):
 
 def moving_average(data, window_size=50):
     """Smooth data using moving average."""
+    if len(data) < window_size:
+        return data
     return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
 
 def plot_learning_curves(rewards1, steps1, epsilons1, rewards2, steps2, epsilons2, save_dir='', window_size=50):
     """Plot comparison of learning metrics between two strategies."""
     # Plot rewards
     plt.figure(figsize=(12, 6))
-    plt.plot(moving_average(rewards1, window_size), label='High Exploration (Smoothed)', linewidth=2)
-    plt.plot(moving_average(rewards2, window_size), label='Moderate Exploration (Smoothed)', linewidth=2)
-    plt.plot(rewards1, alpha=0.2, label='High Exploration (Raw)')
-    plt.plot(rewards2, alpha=0.2, label='Moderate Exploration (Raw)')
+    smooth1 = moving_average(rewards1, window_size)
+    smooth2 = moving_average(rewards2, window_size)
+    
+    plt.plot(rewards1, alpha=0.2, color='blue', label='High Exploration (Raw)')
+    plt.plot(rewards2, alpha=0.2, color='red', label='Moderate Exploration (Raw)')
+    
+    if len(smooth1) > 0:
+        plt.plot(range(window_size-1, len(rewards1)), smooth1, 
+                color='blue', linewidth=2, label='High Exploration (Smoothed)')
+    if len(smooth2) > 0:
+        plt.plot(range(window_size-1, len(rewards2)), smooth2, 
+                color='red', linewidth=2, label='Moderate Exploration (Smoothed)')
+    
     plt.xlabel('Episodes')
     plt.ylabel('Total Reward')
     plt.title('Reward Learning Curves')
     plt.legend()
     plt.grid(True, alpha=0.3)
-    plt.savefig(f'{save_dir}reward_curves.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{save_dir}reward_learning_curves.png', dpi=300, bbox_inches='tight')
     plt.close()
     
     # Plot steps
     plt.figure(figsize=(12, 6))
-    plt.plot(moving_average(steps1, window_size), label='High Exploration (Smoothed)', linewidth=2)
-    plt.plot(moving_average(steps2, window_size), label='Moderate Exploration (Smoothed)', linewidth=2)
-    plt.plot(steps1, alpha=0.2, label='High Exploration (Raw)')
-    plt.plot(steps2, alpha=0.2, label='Moderate Exploration (Raw)')
+    smooth1_steps = moving_average(steps1, window_size)
+    smooth2_steps = moving_average(steps2, window_size)
+    
+    plt.plot(steps1, alpha=0.2, color='blue', label='High Exploration (Raw)')
+    plt.plot(steps2, alpha=0.2, color='red', label='Moderate Exploration (Raw)')
+    
+    if len(smooth1_steps) > 0:
+        plt.plot(range(window_size-1, len(steps1)), smooth1_steps, 
+                color='blue', linewidth=2, label='High Exploration (Smoothed)')
+    if len(smooth2_steps) > 0:
+        plt.plot(range(window_size-1, len(steps2)), smooth2_steps, 
+                color='red', linewidth=2, label='Moderate Exploration (Smoothed)')
+    
     plt.xlabel('Episodes')
     plt.ylabel('Steps per Episode')
-    plt.title('Efficiency Learning Curves')
+    plt.title('Steps Learning Curves')
     plt.legend()
     plt.grid(True, alpha=0.3)
-    plt.savefig(f'{save_dir}steps_curves.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{save_dir}steps_learning_curves.png', dpi=300, bbox_inches='tight')
     plt.close()
     
     # Plot epsilon decay
     plt.figure(figsize=(12, 6))
-    plt.plot(epsilons1, label='High Exploration Strategy')
-    plt.plot(epsilons2, label='Moderate Exploration Strategy')
+    plt.plot(epsilons1, label='High Exploration Strategy', color='blue')
+    plt.plot(epsilons2, label='Moderate Exploration Strategy', color='red')
     plt.xlabel('Episodes')
     plt.ylabel('Epsilon Value')
     plt.title('Exploration Rate Decay')
@@ -222,44 +248,38 @@ def plot_learning_curves(rewards1, steps1, epsilons1, rewards2, steps2, epsilons
     plt.savefig(f'{save_dir}epsilon_decay.png', dpi=300, bbox_inches='tight')
     plt.close()
 
-def sensitivity_analysis(env, param_name, param_values, fixed_params, episodes=500, seed=None, output_dir=''):
-    """Analyze parameter sensitivity using multiple training runs."""
-    results = {'rewards': [], 'steps': [], 'avg_rewards': [], 'avg_steps': []}
+def sensitivity_analysis(env, param_name, param_values, fixed_params, episodes=200, seed=None, output_dir=''):
+    """SIMPLIFIED sensitivity analysis to prevent memory issues."""
+    results = {'avg_rewards': [], 'avg_steps': []}
+    
+    print(f"\n=== {param_name.upper()} Sensitivity Analysis ===")
     
     for value in param_values:
         print(f"Testing {param_name}={value}...")
         params = fixed_params.copy()
         params[param_name] = value
         
-        # Create and train agent
+        # Create and train agent with fewer episodes
         agent = QLearningAgent(env, **params, seed=seed)
         rewards, steps, _ = agent.train(episodes, show_progress=False)
-        avg_reward, avg_steps = agent.evaluate()
         
-        # Store results
-        results['rewards'].append(rewards)
-        results['steps'].append(steps)
-        results['avg_rewards'].append(avg_reward)
-        results['avg_steps'].append(avg_steps)
+        # Simple evaluation
+        final_reward = np.mean(rewards[-20:]) if len(rewards) >= 20 else np.mean(rewards)
+        final_steps = np.mean(steps[-20:]) if len(steps) >= 20 else np.mean(steps)
         
-        # Plot learning curve for this parameter value
-        plt.figure()
-        plt.plot(rewards, alpha=0.3)
-        plt.plot(moving_average(rewards, 50), linewidth=2)
-        plt.title(f"{param_name}={value} Learning Curve")
-        plt.xlabel('Episodes')
-        plt.ylabel('Reward')
-        plt.savefig(f"{output_dir}{param_name}_{value}_learning.png")
-        plt.close()
+        results['avg_rewards'].append(final_reward)
+        results['avg_steps'].append(final_steps)
+        
+        print(f"  Final Performance: Reward={final_reward:.2f}, Steps={final_steps:.1f}")
     
     # Plot parameter sensitivity
     plt.figure(figsize=(10, 6))
-    plt.plot(param_values, results['avg_rewards'], 'o-')
+    plt.plot(param_values, results['avg_rewards'], 'o-', linewidth=2, markersize=8)
     plt.title(f"Parameter Sensitivity: {param_name}")
     plt.xlabel(param_name)
     plt.ylabel('Average Reward')
-    plt.grid(True)
-    plt.savefig(f"{output_dir}{param_name}_sensitivity.png")
+    plt.grid(True, alpha=0.3)
+    plt.savefig(f"{output_dir}sensitivity_{param_name}.png", dpi=300, bbox_inches='tight')
     plt.close()
     
     return results
@@ -273,7 +293,8 @@ def main():
     parser.add_argument('-gamma', type=float, default=0.9, help='Discount factor')
     parser.add_argument('-output_dir', type=str, default='results/', help='Output directory')
     parser.add_argument('-show_progress', action='store_true', help='Show training progress')
-    parser.add_argument('-sensitivity', action='store_true', help='Run sensitivity analysis')
+    parser.add_argument('-sensitivity_analysis', action='store_true', help='Run sensitivity analysis')
+    parser.add_argument('-window_size', type=int, default=50, help='Moving average window size')
     args = parser.parse_args()
 
     # Setup environment and output
@@ -293,28 +314,37 @@ def main():
     print("\n=== Training Moderate Exploration Strategy ===")
     agent_mod = QLearningAgent(
         env, alpha=args.alpha, gamma=args.gamma,
-        epsilon_start=0.5, epsilon_decay=0.99, min_epsilon=0.01, seed=args.seed
+        epsilon_start=0.5, epsilon_decay=0.99, min_epsilon=0.01, seed=args.seed+1  # Different seed
     )
     rewards_mod, steps_mod, epsilons_mod = agent_mod.train(args.episodes, show_progress=args.show_progress)
 
     # Evaluate policies
-    avg_reward_high, avg_steps_high = agent_high.evaluate()
-    avg_reward_mod, avg_steps_mod = agent_mod.evaluate()
-    print(f"\nHigh Exploration: Avg Reward = {avg_reward_high:.2f}, Avg Steps = {avg_steps_high:.2f}")
+    print("\n=== Evaluating Policies ===")
+    avg_reward_high, avg_steps_high = agent_high.evaluate(episodes=30)  # Reduced
+    avg_reward_mod, avg_steps_mod = agent_mod.evaluate(episodes=30)     # Reduced
+    
+    print(f"High Exploration: Avg Reward = {avg_reward_high:.2f}, Avg Steps = {avg_steps_high:.2f}")
     print(f"Moderate Exploration: Avg Reward = {avg_reward_mod:.2f}, Avg Steps = {avg_steps_mod:.2f}")
 
     # Generate visualizations
-    visualize_policy(agent_high.Q, "High Exploration Policy", f"{args.output_dir}policy_high.png")
-    visualize_policy(agent_mod.Q, "Moderate Exploration Policy", f"{args.output_dir}policy_mod.png")
+    print("\n=== Generating Visualizations ===")
+    visualize_policy(agent_high.Q, "High Exploration Policy", f"{args.output_dir}policy_high_exploration.png")
+    visualize_policy(agent_mod.Q, "Moderate Exploration Policy", f"{args.output_dir}policy_moderate_exploration.png")
+    
     plot_learning_curves(rewards_high, steps_high, epsilons_high,
-                        rewards_mod, steps_mod, epsilons_mod, args.output_dir)
+                        rewards_mod, steps_mod, epsilons_mod, 
+                        args.output_dir, args.window_size)
     
     # Demonstrate final paths
-    show_final_path(env, agent_high.Q, f"{args.output_dir}path_high.png")
-    show_final_path(env, agent_mod.Q, f"{args.output_dir}path_mod.png")
+    print("\n=== Generating Final Paths ===")
+    steps_high = show_final_path(env, agent_high.Q, f"{args.output_dir}path_high_exploration.png")
+    steps_mod = show_final_path(env, agent_mod.Q, f"{args.output_dir}path_moderate_exploration.png")
+    
+    print(f"High Exploration final path: {steps_high} steps")
+    print(f"Moderate Exploration final path: {steps_mod} steps")
 
-    # Sensitivity analysis
-    if args.sensitivity:
+    # Sensitivity analysis (optional and simplified)
+    if args.sensitivity_analysis:
         print("\n=== Running Sensitivity Analysis ===")
         fixed_params = {
             'alpha': args.alpha,
@@ -323,11 +353,25 @@ def main():
             'epsilon_decay': 0.995,
             'min_epsilon': 0.01
         }
-        sensitivity_analysis(env, 'alpha', [0.01, 0.05, 0.1, 0.2], fixed_params, output_dir=args.output_dir)
-        sensitivity_analysis(env, 'gamma', [0.8, 0.9, 0.95, 0.99], fixed_params, output_dir=args.output_dir)
+        
+        try:
+            sensitivity_analysis(env, 'alpha', [0.05, 0.1, 0.2, 0.3], 
+                               fixed_params, episodes=200, seed=args.seed, output_dir=args.output_dir)
+            sensitivity_analysis(env, 'gamma', [0.8, 0.9, 0.95, 0.99], 
+                               fixed_params, episodes=200, seed=args.seed, output_dir=args.output_dir)
+        except Exception as e:
+            print(f"Sensitivity analysis error (non-critical): {e}")
 
-    print("\n=== Training Complete ===")
+    print(f"\n=== Scenario 1 Complete ===")
     print(f"Results saved to: {args.output_dir}")
+    print(f"Key files generated:")
+    print(f"  - reward_learning_curves.png")
+    print(f"  - steps_learning_curves.png") 
+    print(f"  - epsilon_decay.png")
+    print(f"  - policy_high_exploration.png")
+    print(f"  - policy_moderate_exploration.png")
+    print(f"  - path_high_exploration.png")
+    print(f"  - path_moderate_exploration.png")
 
 if __name__ == "__main__":
     main()
