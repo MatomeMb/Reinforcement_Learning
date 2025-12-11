@@ -1,4 +1,4 @@
-# CSC3022F Reinforcement Learning
+# Reinforcement Learning
 
 This project implements Q-learning algorithms for the Four-Rooms domain across three distinct scenarios, demonstrating different aspects of reinforcement learning including exploration strategies, multi-objective learning, and sequential decision making.
 
